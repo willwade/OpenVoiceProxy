@@ -11,9 +11,9 @@
   "voiceMapping": [
     {
       "elevenLabsId": "local-voice-1",
-      "elevenLabsName": "Local Voice 1",
-      "localEngine": "espeak",
-      "localVoiceId": "en",
+      "elevenLabsName": "Local Voice 1 (Azure)",
+      "localEngine": "azure",
+      "localVoiceId": "en-US-AvaNeural",
       "parameters": {
         "rate": 1,
         "pitch": 1
@@ -21,9 +21,9 @@
     },
     {
       "elevenLabsId": "local-voice-2",
-      "elevenLabsName": "Local Voice 2",
-      "localEngine": "espeak",
-      "localVoiceId": "en-us",
+      "elevenLabsName": "Local Voice 2 (Azure)",
+      "localEngine": "azure",
+      "localVoiceId": "en-US-BrianNeural",
       "parameters": {
         "rate": 1,
         "pitch": 1

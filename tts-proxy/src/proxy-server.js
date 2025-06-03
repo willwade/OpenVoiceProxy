@@ -23,6 +23,7 @@ class ProxyServer {
         this.ttsClients = new Map();
         this.voiceMapping = new Map();
         this.initializeTTSClients();
+        this.loadVoiceMappings();
 
         this.setupMiddleware();
         this.setupRoutes();
@@ -132,6 +133,23 @@ class ProxyServer {
         }
     }
 
+    loadVoiceMappings() {
+        try {
+            // Load static mappings from config
+            const configMappings = this.configManager.getVoiceMappings();
+            for (const mapping of configMappings) {
+                this.voiceMapping.set(mapping.elevenLabsId, {
+                    engine: mapping.localEngine,
+                    voiceId: mapping.localVoiceId
+                });
+            }
+
+            logger.info(`Loaded ${configMappings.length} voice mappings from config`);
+        } catch (error) {
+            logger.error('Error loading voice mappings:', error);
+        }
+    }
+
     setupMiddleware() {
         // Enable CORS for all routes
         this.app.use(cors());
@@ -183,6 +201,42 @@ class ProxyServer {
 
             const voices = [];
 
+            // Add static voices from config first
+            const configMappings = this.configManager.getVoiceMappings();
+            for (const mapping of configMappings) {
+                const staticVoice = {
+                    voice_id: mapping.elevenLabsId,
+                    name: mapping.elevenLabsName,
+                    samples: null,
+                    category: "premade",
+                    fine_tuning: {
+                        model_id: null,
+                        is_allowed_to_fine_tune: false,
+                        finetuning_state: "not_started",
+                        verification_attempts: null,
+                        verification_failures: [],
+                        verification_attempts_count: 0,
+                        slice_ids: null
+                    },
+                    labels: {
+                        engine: mapping.localEngine,
+                        language: 'en'
+                    },
+                    description: `${mapping.elevenLabsName} from ${mapping.localEngine} engine`,
+                    preview_url: null,
+                    available_for_tiers: [],
+                    settings: {
+                        stability: mapping.parameters?.stability || 0.5,
+                        similarity_boost: mapping.parameters?.similarity_boost || 0.5,
+                        style: 0.0,
+                        use_speaker_boost: true
+                    },
+                    sharing: null,
+                    high_quality_base_model_ids: []
+                };
+                voices.push(staticVoice);
+            }
+
             // Get voices from all available TTS engines
             for (const [engineName, ttsClient] of this.ttsClients) {
                 try {
@@ -224,11 +278,13 @@ class ProxyServer {
 
                         voices.push(elevenLabsVoice);
 
-                        // Update voice mapping
-                        this.voiceMapping.set(elevenLabsVoice.voice_id, {
-                            engine: engineName,
-                            voiceId: voice.id
-                        });
+                        // Update voice mapping (only if not already mapped from config)
+                        if (!this.voiceMapping.has(elevenLabsVoice.voice_id)) {
+                            this.voiceMapping.set(elevenLabsVoice.voice_id, {
+                                engine: engineName,
+                                voiceId: voice.id
+                            });
+                        }
                     }
                 } catch (engineError) {
                     logger.warn(`Failed to get voices from ${engineName}:`, engineError.message);
