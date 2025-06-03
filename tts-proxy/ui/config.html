@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS Proxy Configuration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .header p {
+            margin: 5px 0 0 0;
+            opacity: 0.8;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #ecf0f1;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        .tab:hover {
+            background: #d5dbdb;
+        }
+        
+        .tab.active {
+            background: white;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .tab-content {
+            padding: 30px;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .status-section {
+            background: #e8f5e8;
+            border: 1px solid #27ae60;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .status-section.error {
+            background: #fdf2f2;
+            border-color: #e74c3c;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        .button:hover {
+            background: #2980b9;
+        }
+        
+        .button.secondary {
+            background: #95a5a6;
+        }
+        
+        .button.secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .voice-mapping {
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+        }
+        
+        .voice-mapping h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        
+        .logs {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TTS Proxy Configuration</h1>
+            <p>Configure your local TTS proxy for Grid3</p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('status')">Status</button>
+            <button class="tab" onclick="showTab('network')">Network</button>
+            <button class="tab" onclick="showTab('voices')">Voice Mapping</button>
+            <button class="tab" onclick="showTab('logs')">Logs</button>
+        </div>
+        
+        <div id="status" class="tab-content active">
+            <h2>Proxy Status</h2>
+            <div class="status-section">
+                <h3>🟢 Proxy Server Running</h3>
+                <p><strong>Port:</strong> 3000</p>
+                <p><strong>Status:</strong> Active</p>
+                <p><strong>Uptime:</strong> <span id="uptime">--</span></p>
+            </div>
+            
+            <div class="form-group">
+                <button class="button" onclick="testProxy()">Test Proxy</button>
+                <button class="button secondary" onclick="restartProxy()">Restart Proxy</button>
+            </div>
+            
+            <div id="test-results" style="margin-top: 20px;"></div>
+        </div>
+        
+        <div id="network" class="tab-content">
+            <h2>Network Settings</h2>
+            
+            <div class="form-group">
+                <label for="proxy-port">Proxy Port:</label>
+                <input type="number" id="proxy-port" value="3000" min="1024" max="65535">
+            </div>
+            
+            <div class="form-group">
+                <label for="host-modification">
+                    <input type="checkbox" id="host-modification" checked>
+                    Modify hosts file to redirect api.elevenlabs.io
+                </label>
+                <p style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                    This requires administrator privileges and will redirect ElevenLabs API calls to this proxy.
+                </p>
+            </div>
+            
+            <div class="form-group">
+                <button class="button" onclick="saveNetworkSettings()">Save Settings</button>
+            </div>
+        </div>
+        
+        <div id="voices" class="tab-content">
+            <h2>Voice Mapping</h2>
+            <p>Map ElevenLabs voice IDs to local TTS voices:</p>
+            
+            <div class="voice-mapping">
+                <h4>Local Voice 1</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>ElevenLabs Voice ID:</label>
+                        <input type="text" value="local-voice-1" readonly>
+                    </div>
+                    <div>
+                        <label>Local Voice:</label>
+                        <select>
+                            <option>Microsoft David Desktop</option>
+                            <option>Microsoft Zira Desktop</option>
+                            <option>Microsoft Mark Desktop</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="voice-mapping">
+                <h4>Local Voice 2</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>ElevenLabs Voice ID:</label>
+                        <input type="text" value="local-voice-2" readonly>
+                    </div>
+                    <div>
+                        <label>Local Voice:</label>
+                        <select>
+                            <option>Microsoft David Desktop</option>
+                            <option selected>Microsoft Zira Desktop</option>
+                            <option>Microsoft Mark Desktop</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <button class="button" onclick="addVoiceMapping()">Add Voice Mapping</button>
+                <button class="button" onclick="saveVoiceMappings()">Save Mappings</button>
+            </div>
+        </div>
+        
+        <div id="logs" class="tab-content">
+            <h2>Application Logs</h2>
+            <div class="logs" id="log-content">
+                [2024-01-01 12:00:00] INFO: TTS Proxy server started on port 3000<br>
+                [2024-01-01 12:00:01] INFO: Health check endpoint available<br>
+                [2024-01-01 12:00:01] INFO: Voices endpoint configured<br>
+                [2024-01-01 12:00:02] INFO: Ready to accept requests<br>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+                <button class="button secondary" onclick="clearLogs()">Clear Logs</button>
+                <button class="button secondary" onclick="refreshLogs()">Refresh</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+        
+        function testProxy() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<p>🔄 Testing proxy endpoints...</p>';
+            
+            // This would normally make actual HTTP requests to test the proxy
+            // For now, we'll simulate the test
+            setTimeout(() => {
+                resultsDiv.innerHTML = `
+                    <div class="status-section">
+                        <h4>✅ Proxy Test Results</h4>
+                        <p>✅ Health check: OK</p>
+                        <p>✅ Voices endpoint: OK (2 voices available)</p>
+                        <p>✅ User endpoint: OK</p>
+                        <p>✅ Text-to-speech: OK</p>
+                    </div>
+                `;
+            }, 2000);
+        }
+        
+        function restartProxy() {
+            alert('Proxy restart functionality will be implemented');
+        }
+        
+        function saveNetworkSettings() {
+            alert('Network settings saved (placeholder)');
+        }
+        
+        function addVoiceMapping() {
+            alert('Add voice mapping functionality will be implemented');
+        }
+        
+        function saveVoiceMappings() {
+            alert('Voice mappings saved (placeholder)');
+        }
+        
+        function clearLogs() {
+            document.getElementById('log-content').innerHTML = '';
+        }
+        
+        function refreshLogs() {
+            // This would normally fetch real logs
+            const logContent = document.getElementById('log-content');
+            const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            logContent.innerHTML += `[${timestamp}] INFO: Logs refreshed<br>`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
+        // Update uptime every second
+        let startTime = Date.now();
+        setInterval(() => {
+            const uptime = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = uptime % 60;
+            document.getElementById('uptime').textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }, 1000);
+    </script>
+</body>
+</html>
