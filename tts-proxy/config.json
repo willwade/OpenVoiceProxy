@@ -1,0 +1,60 @@
+{
+  "general": {
+    "autoStart": false,
+    "minimizeToTray": true,
+    "logLevel": "info"
+  },
+  "network": {
+    "port": 3000,
+    "modifyHostFile": false
+  },
+  "voiceMapping": [
+    {
+      "elevenLabsId": "local-voice-1",
+      "elevenLabsName": "Local Voice 1",
+      "localEngine": "espeak",
+      "localVoiceId": "en",
+      "parameters": {
+        "rate": 1,
+        "pitch": 1
+      }
+    },
+    {
+      "elevenLabsId": "local-voice-2",
+      "elevenLabsName": "Local Voice 2",
+      "localEngine": "espeak",
+      "localVoiceId": "en-us",
+      "parameters": {
+        "rate": 1,
+        "pitch": 1
+      }
+    }
+  ],
+  "audio": {
+    "format": "wav",
+    "quality": "medium",
+    "cacheEnabled": false,
+    "cachePath": "./cache"
+  },
+  "engines": {
+    "espeak": {
+      "enabled": true,
+      "priority": 1
+    },
+    "azure": {
+      "enabled": false,
+      "priority": 2,
+      "credentials": {
+        "subscriptionKey": "",
+        "region": "westeurope"
+      }
+    },
+    "elevenlabs": {
+      "enabled": false,
+      "priority": 3,
+      "credentials": {
+        "apiKey": ""
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@ const cors = require('cors');
 const logger = require('./logger');
 const { createTTSClient } = require('js-tts-wrapper');
 const ConfigManager = require('./config-manager');
+const EnvironmentLoader = require('./env-loader');
 
 class ProxyServer {
     constructor(port = 3000) {
@@ -10,6 +11,9 @@ class ProxyServer {
         this.app = express();
         this.server = null;
         this.isRunning = false;
+
+        // Load environment variables first
+        this.envLoader = new EnvironmentLoader();
 
         // Initialize configuration
         this.configManager = new ConfigManager();
@@ -26,18 +30,23 @@ class ProxyServer {
 
     initializeTTSClients() {
         try {
+            const availableEngines = this.envLoader.getAvailableEngines();
+            logger.info(`Attempting to initialize engines: ${availableEngines.join(', ')}`);
+
             // Initialize eSpeak (works without credentials)
-            logger.info('Initializing eSpeak TTS client...');
-            try {
-                const espeakClient = createTTSClient('espeak-wasm');
-                this.ttsClients.set('espeak', espeakClient);
-                logger.info('✅ eSpeak TTS client initialized');
-            } catch (espeakError) {
-                logger.warn('⚠️ eSpeak initialization failed:', espeakError.message);
+            if (availableEngines.includes('espeak-wasm')) {
+                try {
+                    logger.info('Initializing eSpeak TTS client...');
+                    const espeakClient = createTTSClient('espeak-wasm');
+                    this.ttsClients.set('espeak', espeakClient);
+                    logger.info('✅ eSpeak TTS client initialized');
+                } catch (espeakError) {
+                    logger.warn('⚠️ eSpeak initialization failed:', espeakError.message);
+                }
             }
 
-            // Try to initialize Azure if credentials are available
-            if (process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION) {
+            // Initialize Azure if credentials are available
+            if (availableEngines.includes('azure')) {
                 try {
                     logger.info('Initializing Azure TTS client...');
                     const azureClient = createTTSClient('azure', {
@@ -51,8 +60,34 @@ class ProxyServer {
                 }
             }
 
-            // Try to initialize ElevenLabs if API key is available (for comparison)
-            if (process.env.ELEVENLABS_API_KEY) {
+            // Initialize Google if credentials are available
+            if (availableEngines.includes('google')) {
+                try {
+                    logger.info('Initializing Google TTS client...');
+                    const googleClient = createTTSClient('google');
+                    this.ttsClients.set('google', googleClient);
+                    logger.info('✅ Google TTS client initialized');
+                } catch (googleError) {
+                    logger.warn('⚠️ Google initialization failed:', googleError.message);
+                }
+            }
+
+            // Initialize AWS Polly if credentials are available
+            if (availableEngines.includes('aws-polly')) {
+                try {
+                    logger.info('Initializing AWS Polly TTS client...');
+                    const pollyClient = createTTSClient('aws-polly', {
+                        region: process.env.AWS_REGION || 'us-east-1'
+                    });
+                    this.ttsClients.set('aws-polly', pollyClient);
+                    logger.info('✅ AWS Polly TTS client initialized');
+                } catch (pollyError) {
+                    logger.warn('⚠️ AWS Polly initialization failed:', pollyError.message);
+                }
+            }
+
+            // Initialize ElevenLabs if API key is available
+            if (availableEngines.includes('elevenlabs')) {
                 try {
                     logger.info('Initializing ElevenLabs TTS client...');
                     const elevenLabsClient = createTTSClient('elevenlabs', {
@@ -62,6 +97,20 @@ class ProxyServer {
                     logger.info('✅ ElevenLabs TTS client initialized');
                 } catch (elevenLabsError) {
                     logger.warn('⚠️ ElevenLabs initialization failed:', elevenLabsError.message);
+                }
+            }
+
+            // Initialize OpenAI if API key is available
+            if (availableEngines.includes('openai')) {
+                try {
+                    logger.info('Initializing OpenAI TTS client...');
+                    const openaiClient = createTTSClient('openai', {
+                        apiKey: process.env.OPENAI_API_KEY
+                    });
+                    this.ttsClients.set('openai', openaiClient);
+                    logger.info('✅ OpenAI TTS client initialized');
+                } catch (openaiError) {
+                    logger.warn('⚠️ OpenAI initialization failed:', openaiError.message);
                 }
             }
 
@@ -256,14 +305,42 @@ class ProxyServer {
 
             try {
                 // Set the voice
-                ttsClient.setVoice(voiceMapping.voiceId);
+                if (ttsClient.setVoice) {
+                    ttsClient.setVoice(voiceMapping.voiceId);
+                }
 
-                // Generate speech
+                // Generate speech - ensure we get bytes, not play audio
                 logger.info(`Generating speech with ${voiceMapping.engine} engine...`);
-                const audioBytes = await ttsClient.synthToBytes(text);
 
-                // Set appropriate headers
-                res.setHeader('Content-Type', 'audio/wav'); // eSpeak typically outputs WAV
+                let audioBytes;
+                if (ttsClient.synthToBytes) {
+                    audioBytes = await ttsClient.synthToBytes(text);
+                } else if (ttsClient.synth) {
+                    // Some engines might only have synth method
+                    const audioBuffer = await ttsClient.synth(text);
+                    audioBytes = new Uint8Array(audioBuffer);
+                } else {
+                    throw new Error('TTS client does not support audio synthesis');
+                }
+
+                // Ensure we have valid audio data
+                if (!audioBytes || audioBytes.length === 0) {
+                    throw new Error('No audio data generated');
+                }
+
+                // Set appropriate headers based on engine
+                let contentType = 'audio/wav'; // Default
+                if (voiceMapping.engine === 'elevenlabs') {
+                    contentType = 'audio/mpeg';
+                } else if (voiceMapping.engine === 'openai') {
+                    contentType = 'audio/mpeg';
+                } else if (voiceMapping.engine === 'google') {
+                    contentType = 'audio/wav';
+                } else if (voiceMapping.engine === 'azure') {
+                    contentType = 'audio/wav';
+                }
+
+                res.setHeader('Content-Type', contentType);
                 res.setHeader('Content-Length', audioBytes.length);
 
                 // Send the audio data
