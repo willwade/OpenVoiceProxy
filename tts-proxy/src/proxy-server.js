@@ -1,9 +1,15 @@
 const express = require('express');
 const cors = require('cors');
-const logger = require('./logger');
+const path = require('path');
+const logger = process.env.NODE_ENV === 'production' ?
+    require('./production-logger') : require('./logger');
 const { createTTSClient } = require('js-tts-wrapper');
 const ConfigManager = require('./config-manager');
+const ProductionConfig = require('./production-config');
 const EnvironmentLoader = require('./env-loader');
+const DatabaseKeyManager = require('./database-key-manager');
+const AuthMiddleware = require('./auth-middleware');
+const SecurityMiddleware = require('./security-middleware');
 
 class ProxyServer {
     constructor(port = 3000) {
@@ -15,9 +21,18 @@ class ProxyServer {
         // Load environment variables first
         this.envLoader = new EnvironmentLoader();
 
-        // Initialize configuration
-        this.configManager = new ConfigManager();
+        // Initialize configuration (use production config in production)
+        if (process.env.NODE_ENV === 'production') {
+            this.configManager = new ProductionConfig();
+        } else {
+            this.configManager = new ConfigManager();
+        }
         this.port = this.configManager.get('network.port') || port;
+
+        // Initialize authentication and security systems
+        this.keyManager = new DatabaseKeyManager();
+        this.authMiddleware = new AuthMiddleware(this.keyManager);
+        this.securityMiddleware = new SecurityMiddleware();
 
         // Initialize TTS clients
         this.ttsClients = new Map();
@@ -151,31 +166,108 @@ class ProxyServer {
     }
 
     setupMiddleware() {
+        // Trust proxy if configured (for DigitalOcean App Platform)
+        if (process.env.TRUST_PROXY === 'true') {
+            this.app.set('trust proxy', true);
+        }
+
+        // Security middleware
+        this.app.use(this.securityMiddleware.securityHeaders());
+        this.app.use(this.securityMiddleware.validateRequest());
+        this.app.use(this.securityMiddleware.ipFilter());
+        this.app.use(this.securityMiddleware.requestLogger());
+
         // Enable CORS for all routes
-        this.app.use(cors());
-        
-        // Parse JSON bodies
-        this.app.use(express.json());
-        
-        // Log all requests
-        this.app.use((req, res, next) => {
-            logger.info(`${req.method} ${req.path}`, {
-                headers: req.headers,
-                body: req.body,
-                query: req.query
-            });
-            next();
-        });
+        this.app.use(cors({
+            origin: process.env.CORS_ORIGIN || '*',
+            credentials: true,
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
+        }));
+
+        // Parse JSON bodies with size limit
+        this.app.use(express.json({
+            limit: process.env.MAX_REQUEST_SIZE || '10mb',
+            strict: true
+        }));
+
+        // Parse URL-encoded bodies (for admin forms)
+        this.app.use(express.urlencoded({
+            extended: true,
+            limit: process.env.MAX_REQUEST_SIZE || '10mb'
+        }));
+
+        // Serve static files for admin interface
+        this.app.use('/admin', express.static(path.join(__dirname, '..', 'public')));
+
+        // Authentication middleware for API routes
+        this.app.use('/v1', this.authMiddleware.authenticate());
     }
 
     setupRoutes() {
         // Health check endpoint
         this.app.get('/health', (req, res) => {
-            res.json({ 
-                status: 'ok', 
-                service: 'tts-proxy',
+            const healthInfo = logger.getHealthInfo ? logger.getHealthInfo() : {
+                status: 'ok',
+                service: 'openvoiceproxy',
                 timestamp: new Date().toISOString()
+            };
+            res.json(healthInfo);
+        });
+
+        // Metrics endpoint (basic monitoring)
+        this.app.get('/metrics', (req, res) => {
+            const metrics = logger.getMetrics ? logger.getMetrics() : {};
+            const memUsage = process.memoryUsage();
+
+            res.json({
+                service: 'openvoiceproxy',
+                timestamp: new Date().toISOString(),
+                uptime: process.uptime(),
+                memory: {
+                    rss: memUsage.rss,
+                    heapTotal: memUsage.heapTotal,
+                    heapUsed: memUsage.heapUsed,
+                    external: memUsage.external
+                },
+                ...metrics
             });
+        });
+
+        // Ready endpoint (for deployment health checks)
+        this.app.get('/ready', async (req, res) => {
+            try {
+                // Check if key manager is initialized
+                await this.keyManager.initialize();
+
+                // Check if at least one TTS engine is available
+                const hasEngines = this.ttsClients.size > 0;
+
+                if (hasEngines) {
+                    res.json({
+                        status: 'ready',
+                        engines: Array.from(this.ttsClients.keys()),
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    res.status(503).json({
+                        status: 'not ready',
+                        reason: 'No TTS engines available',
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            } catch (error) {
+                res.status(503).json({
+                    status: 'not ready',
+                    reason: error.message,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+
+        // Admin interface redirect
+        this.app.get('/admin', (req, res) => {
+            res.redirect('/admin/admin.html');
         });
 
         // ElevenLabs API v1 routes
@@ -184,15 +276,26 @@ class ProxyServer {
         this.app.post('/v1/text-to-speech/:voiceId', this.textToSpeechSimple.bind(this));
         this.app.get('/v1/user', this.getUser.bind(this));
 
+        // Admin routes (require admin API key)
+        this.app.use('/admin/api', this.authMiddleware.authenticate({ adminOnly: true }));
+        this.app.get('/admin/api/keys', this.adminListKeys.bind(this));
+        this.app.post('/admin/api/keys', this.adminCreateKey.bind(this));
+        this.app.put('/admin/api/keys/:keyId', this.adminUpdateKey.bind(this));
+        this.app.delete('/admin/api/keys/:keyId', this.adminDeleteKey.bind(this));
+        this.app.get('/admin/api/usage', this.adminGetUsage.bind(this));
+
         // Catch-all for unhandled routes
         this.app.use('*', (req, res) => {
             logger.warn(`Unhandled route: ${req.method} ${req.originalUrl}`);
-            res.status(404).json({ 
+            res.status(404).json({
                 error: 'Route not found',
                 method: req.method,
                 path: req.originalUrl
             });
         });
+
+        // Error handling middleware (must be last)
+        this.app.use(this.securityMiddleware.errorHandler());
     }
 
     async getVoices(req, res) {
@@ -419,6 +522,96 @@ class ProxyServer {
 
         } catch (error) {
             logger.error('Error in text-to-speech:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    // Admin API endpoints
+    async adminListKeys(req, res) {
+        try {
+            const keys = this.keyManager.listKeys();
+            res.json({ keys });
+        } catch (error) {
+            logger.error('Error listing API keys:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async adminCreateKey(req, res) {
+        try {
+            const { name, isAdmin, active, rateLimit, expiresAt } = req.body;
+            const keyData = await this.keyManager.createKey({
+                name,
+                isAdmin: isAdmin || false,
+                active: active !== false,
+                rateLimit,
+                expiresAt
+            });
+
+            res.status(201).json({
+                message: 'API key created successfully',
+                key: {
+                    id: keyData.id,
+                    key: keyData.key, // Only return the key on creation
+                    name: keyData.name,
+                    isAdmin: keyData.isAdmin,
+                    active: keyData.active,
+                    createdAt: keyData.createdAt
+                }
+            });
+        } catch (error) {
+            logger.error('Error creating API key:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async adminUpdateKey(req, res) {
+        try {
+            const { keyId } = req.params;
+            const updates = req.body;
+
+            const updatedKey = await this.keyManager.updateKey(keyId, updates);
+            res.json({
+                message: 'API key updated successfully',
+                key: {
+                    id: updatedKey.id,
+                    name: updatedKey.name,
+                    isAdmin: updatedKey.isAdmin,
+                    active: updatedKey.active
+                }
+            });
+        } catch (error) {
+            if (error.message === 'API key not found') {
+                res.status(404).json({ error: 'API key not found' });
+            } else {
+                logger.error('Error updating API key:', error);
+                res.status(500).json({ error: 'Internal server error' });
+            }
+        }
+    }
+
+    async adminDeleteKey(req, res) {
+        try {
+            const { keyId } = req.params;
+            await this.keyManager.deleteKey(keyId);
+            res.json({ message: 'API key deleted successfully' });
+        } catch (error) {
+            if (error.message === 'API key not found') {
+                res.status(404).json({ error: 'API key not found' });
+            } else {
+                logger.error('Error deleting API key:', error);
+                res.status(500).json({ error: 'Internal server error' });
+            }
+        }
+    }
+
+    async adminGetUsage(req, res) {
+        try {
+            const { keyId, days } = req.query;
+            const stats = this.keyManager.getUsageStats(keyId, days ? parseInt(days) : 7);
+            res.json({ usage: stats });
+        } catch (error) {
+            logger.error('Error getting usage stats:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     }

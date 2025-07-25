@@ -1,0 +1,32 @@
+[
+  {
+    "id": "5cee0d3e-4a02-4ea1-8bfe-e3ba49450620",
+    "key": "tts_a9515cdc6f9f8a8ffd97b070676a8bcc16f46cd2c20b6dffa3c589e5d6f16949",
+    "name": "Initial Admin Key",
+    "isAdmin": true,
+    "active": true,
+    "rateLimit": {
+      "requests": 100,
+      "windowMs": 60000
+    },
+    "expiresAt": null,
+    "createdAt": "2025-07-25T13:33:15.844Z",
+    "lastUsed": "2025-07-25T13:36:37.358Z",
+    "requestCount": 5
+  },
+  {
+    "id": "3023943a-edde-4585-8aff-def17d2cdc25",
+    "key": "tts_6751e315d69a23fdeab09a0fa50c38d9ec132a5697855ffea63b52390381896a",
+    "name": "Test API Key",
+    "isAdmin": false,
+    "active": true,
+    "rateLimit": {
+      "requests": 100,
+      "windowMs": 60000
+    },
+    "expiresAt": null,
+    "createdAt": "2025-07-25T13:36:20.243Z",
+    "lastUsed": "2025-07-25T13:36:27.289Z",
+    "requestCount": 1
+  }
+]

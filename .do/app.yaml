@@ -1,0 +1,68 @@
+name: openvoiceproxy
+services:
+- name: openvoiceproxy-api
+  source_dir: /
+  github:
+    repo: willwade/OpenVoiceProxy
+    branch: main
+    deploy_on_push: true
+  run_command: cd tts-proxy && npm start:production
+  build_command: cd tts-proxy && npm install --production
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  http_port: 3000
+  health_check:
+    http_path: /health
+    initial_delay_seconds: 30
+    period_seconds: 10
+    timeout_seconds: 5
+    success_threshold: 1
+    failure_threshold: 3
+  envs:
+  - key: NODE_ENV
+    value: production
+  - key: PORT
+    value: "3000"
+  - key: LOG_LEVEL
+    value: info
+  - key: API_KEY_REQUIRED
+    value: "true"
+  - key: ADMIN_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: AZURE_SPEECH_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: AZURE_SPEECH_REGION
+    scope: RUN_TIME
+    type: SECRET
+  - key: ELEVENLABS_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: OPENAI_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: AWS_ACCESS_KEY_ID
+    scope: RUN_TIME
+    type: SECRET
+  - key: AWS_SECRET_ACCESS_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: AWS_REGION
+    scope: RUN_TIME
+    type: SECRET
+  - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+    scope: RUN_TIME
+    type: SECRET
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    type: SECRET
+  routes:
+  - path: /
+databases:
+- name: openvoiceproxy-db
+  engine: PG
+  version: "15"
+  size: basic
+  num_nodes: 1

@@ -1,19 +1,24 @@
 {
-  "name": "grid3-tts-proxy",
+  "name": "openvoiceproxy",
   "version": "1.0.0",
-  "description": "TTS Proxy for Grid3 - Intercepts ElevenLabs API calls and redirects to local TTS engines",
+  "description": "OpenVoiceProxy - Secure TTS proxy that intercepts ElevenLabs API calls and redirects to various TTS engines",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "start:production": "node server-production.js",
+    "start:server": "node start-server.js",
     "dev": "electron . --dev",
     "test": "node src/test-proxy.js"
   },
   "keywords": [
     "tts",
     "proxy",
-    "grid3",
+    "openvoiceproxy",
     "elevenlabs",
-    "electron"
+    "azure",
+    "openai",
+    "aws-polly",
+    "google-tts"
   ],
   "author": "Will Wade",
   "license": "MIT",
@@ -36,6 +41,7 @@
     "node-fetch": "^2.7.0",
     "openai": "^4.104.0",
     "pcm-convert": "^1.6.5",
+    "pg": "^8.11.3",
     "sherpa-onnx-node": "^1.12.0",
     "sound-play": "^1.1.0",
     "tar-stream": "^3.1.7",

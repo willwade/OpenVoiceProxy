@@ -1,6 +1,6 @@
-# Grid3 TTS Proxy
+# OpenVoiceProxy
 
-A proxy server that intercepts ElevenLabs API calls from Grid3 and redirects them to local TTS engines using js-tts-wrapper.
+A secure, cloud-ready proxy server that intercepts ElevenLabs API calls and redirects them to various TTS engines. Designed for production deployment on DigitalOcean App Platform with comprehensive security, monitoring, and key management features.
 
 ## Quick Start
 
