@@ -10,7 +10,7 @@ class VoiceConfigurator {
         console.log('🔍 Discovering available TTS voices...');
         console.log('=' .repeat(40));
 
-        const engines = ['espeak-wasm'];
+        const engines = ['espeak'];
         const allVoices = new Map();
 
         // Add other engines if credentials are available

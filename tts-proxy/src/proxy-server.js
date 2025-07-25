@@ -50,10 +50,10 @@ class ProxyServer {
             logger.info(`Attempting to initialize engines: ${availableEngines.join(', ')}`);
 
             // Initialize eSpeak (works without credentials)
-            if (availableEngines.includes('espeak-wasm')) {
+            if (availableEngines.includes('espeak')) {
                 try {
                     logger.info('Initializing eSpeak TTS client...');
-                    const espeakClient = createTTSClient('espeak-wasm');
+                    const espeakClient = createTTSClient('espeak');
                     this.ttsClients.set('espeak', espeakClient);
                     logger.info('✅ eSpeak TTS client initialized');
                 } catch (espeakError) {

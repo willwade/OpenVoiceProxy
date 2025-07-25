@@ -90,7 +90,7 @@ class EnvironmentLoader {
     }
 
     getAvailableEngines() {
-        const engines = ['espeak-wasm']; // Always available
+        const engines = ['espeak']; // Always available (server-compatible)
 
         if (process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION) {
             engines.push('azure');
