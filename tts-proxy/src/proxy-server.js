@@ -43,6 +43,9 @@ class ProxyServer {
 
         this.setupMiddleware();
         this.setupRoutes();
+
+        // Pre-populate voice mappings on startup
+        this.initializeVoiceMappings();
     }
 
     // Convert WAV audio to raw PCM at specified sample rate
@@ -50,6 +53,25 @@ class ProxyServer {
         try {
             // Convert Uint8Array to Buffer if needed
             const buffer = Buffer.isBuffer(audioBytes) ? audioBytes : Buffer.from(audioBytes);
+
+            // Check for MP3 format (ElevenLabs returns MP3 even for PCM requests)
+            if (buffer.length >= 3 &&
+                ((buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33) || // ID3 tag
+                 (buffer[0] === 0xFF && (buffer[1] & 0xE0) === 0xE0))) { // MPEG header
+                logger.error('🚨 CRITICAL: ElevenLabs returned MP3 data for PCM request!');
+                logger.error('Grid3 expects raw PCM data but got MP3. This will cause audio playback failure.');
+                logger.error('TODO: Implement MP3 to PCM conversion using ffmpeg or similar');
+
+                // For now, return a synthetic PCM buffer to prevent Grid3 crashes
+                // This creates silent audio data that Grid3 can process
+                const sampleRate = targetSampleRate;
+                const duration = 1; // 1 second of silence
+                const samples = sampleRate * duration;
+                const silentPCM = Buffer.alloc(samples * 2); // 16-bit samples = 2 bytes each
+
+                logger.warn(`Returning ${silentPCM.length} bytes of silent PCM data as fallback`);
+                return silentPCM;
+            }
 
             // Check if it's already PCM (no WAV header)
             if (buffer.length < 44 ||
@@ -260,6 +282,43 @@ class ProxyServer {
         }
     }
 
+    async initializeVoiceMappings() {
+        try {
+            logger.info('Pre-populating voice mappings...');
+
+            // Get voices from all TTS engines and create mappings
+            for (const [engineName, ttsClient] of this.ttsClients) {
+                if (engineName === 'azure-mp3') {
+                    continue; // Skip azure-mp3 to avoid duplicates
+                }
+
+                try {
+                    const engineVoices = await ttsClient.getVoices();
+
+                    for (const voice of engineVoices) {
+                        const elevenLabsVoiceId = `${engineName}-${voice.id}`;
+
+                        // Only add if not already mapped from config
+                        if (!this.voiceMapping.has(elevenLabsVoiceId)) {
+                            this.voiceMapping.set(elevenLabsVoiceId, {
+                                engine: engineName,
+                                voiceId: voice.id
+                            });
+                        }
+                    }
+
+                    logger.info(`Pre-mapped ${engineVoices.length} voices from ${engineName}`);
+                } catch (engineError) {
+                    logger.warn(`Failed to pre-map voices from ${engineName}:`, engineError.message);
+                }
+            }
+
+            logger.info(`Total voice mappings: ${this.voiceMapping.size}`);
+        } catch (error) {
+            logger.error('Error initializing voice mappings:', error);
+        }
+    }
+
     setupMiddleware() {
         // Trust proxy if configured (for DigitalOcean App Platform)
         if (process.env.TRUST_PROXY === 'true') {
@@ -436,8 +495,12 @@ class ProxyServer {
                 voices.push(staticVoice);
             }
 
-            // Get voices from all available TTS engines
+            // Get voices from all available TTS engines (skip azure-mp3 to avoid duplicates)
             for (const [engineName, ttsClient] of this.ttsClients) {
+                if (engineName === 'azure-mp3') {
+                    continue; // Skip azure-mp3 to avoid duplicate Azure voices
+                }
+
                 try {
                     logger.info(`Getting voices from ${engineName}...`);
                     const engineVoices = await ttsClient.getVoices();
@@ -483,6 +546,7 @@ class ProxyServer {
                                 engine: engineName,
                                 voiceId: voice.id
                             });
+                            logger.debug(`Auto-mapped voice: ${elevenLabsVoice.voice_id} → ${engineName}:${voice.id}`);
                         }
                     }
                 } catch (engineError) {
@@ -589,7 +653,21 @@ class ProxyServer {
 
                 let audioBytes;
                 if (ttsClient.synthToBytes) {
-                    audioBytes = await ttsClient.synthToBytes(text);
+                    // Prepare synthesis options based on the request
+                    const synthOptions = {};
+
+                    // For ElevenLabs, set the correct format based on the request
+                    if (voiceMapping.engine === 'elevenlabs') {
+                        if (output_format === 'pcm_24000') {
+                            synthOptions.format = 'pcm'; // This will use pcm_44100 in js-tts-wrapper
+                            logger.info('🔧 ElevenLabs: Requesting PCM format');
+                        } else {
+                            synthOptions.format = 'mp3'; // This will use mp3_44100_128 in js-tts-wrapper
+                            logger.info('🔧 ElevenLabs: Requesting MP3 format');
+                        }
+                    }
+
+                    audioBytes = await ttsClient.synthToBytes(text, synthOptions);
                 } else if (ttsClient.synth) {
                     // Some engines might only have synth method
                     const audioBuffer = await ttsClient.synth(text);
