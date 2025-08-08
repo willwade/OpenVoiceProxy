@@ -10,6 +10,7 @@ const EnvironmentLoader = require('./env-loader');
 const DatabaseKeyManager = require('./database-key-manager');
 const AuthMiddleware = require('./auth-middleware');
 const SecurityMiddleware = require('./security-middleware');
+const pcmConvert = require('pcm-convert');
 
 class ProxyServer {
     constructor(port = 3000) {
@@ -42,6 +43,33 @@ class ProxyServer {
 
         this.setupMiddleware();
         this.setupRoutes();
+    }
+
+    // Convert WAV audio to raw PCM at specified sample rate
+    convertToPCM(audioBytes, targetSampleRate = 24000) {
+        try {
+            // Check if it's already PCM (no WAV header)
+            if (audioBytes.length < 44 ||
+                audioBytes[0] !== 0x52 || audioBytes[1] !== 0x49 ||
+                audioBytes[2] !== 0x46 || audioBytes[3] !== 0x46) {
+                // Not a WAV file, assume it's already raw audio
+                logger.info('Audio appears to be raw format, returning as-is');
+                return audioBytes;
+            }
+
+            // Extract PCM data from WAV (skip 44-byte header)
+            const pcmData = audioBytes.slice(44);
+
+            // For now, return the raw PCM data
+            // TODO: Add sample rate conversion if needed
+            logger.info(`Extracted ${pcmData.length} bytes of PCM data from WAV`);
+            return pcmData;
+
+        } catch (error) {
+            logger.error('Error converting to PCM:', error);
+            // Return original data if conversion fails
+            return audioBytes;
+        }
     }
 
     initializeTTSClients() {
@@ -275,6 +303,7 @@ class ProxyServer {
         this.app.post('/v1/text-to-speech/:voiceId/stream/with-timestamps', this.textToSpeech.bind(this));
         this.app.post('/v1/text-to-speech/:voiceId', this.textToSpeechSimple.bind(this));
         this.app.get('/v1/user', this.getUser.bind(this));
+        this.app.get('/v1/models', this.getModels.bind(this));
 
         // Admin routes (require admin API key)
         this.app.use('/admin/api', this.authMiddleware.authenticate({ adminOnly: true }));
@@ -439,11 +468,13 @@ class ProxyServer {
         try {
             const { voiceId } = req.params;
             const { text, model_id, voice_settings } = req.body;
+            const { output_format } = req.query;
 
             logger.info(`Text-to-speech request for voice ${voiceId}:`, {
                 text: text?.substring(0, 100) + (text?.length > 100 ? '...' : ''),
                 model_id,
-                voice_settings
+                voice_settings,
+                output_format
             });
 
             // Get the voice mapping
@@ -487,9 +518,17 @@ class ProxyServer {
                     throw new Error('No audio data generated');
                 }
 
-                // Set appropriate headers based on engine
+                // Set appropriate headers based on output format and engine
                 let contentType = 'audio/wav'; // Default
-                if (voiceMapping.engine === 'elevenlabs') {
+                let finalAudioBytes = audioBytes;
+
+                // ElevenLabs API always returns raw PCM data for TTS requests
+                // Grid3 expects raw PCM data from all ElevenLabs endpoints
+                if (output_format === 'pcm_24000' || req.path.includes('/v1/text-to-speech/')) {
+                    contentType = 'audio/pcm';
+                    logger.info('Converting to PCM audio format (ElevenLabs compatibility)');
+                    finalAudioBytes = this.convertToPCM(audioBytes, 24000);
+                } else if (voiceMapping.engine === 'elevenlabs') {
                     contentType = 'audio/mpeg';
                 } else if (voiceMapping.engine === 'openai') {
                     contentType = 'audio/mpeg';
@@ -500,12 +539,12 @@ class ProxyServer {
                 }
 
                 res.setHeader('Content-Type', contentType);
-                res.setHeader('Content-Length', audioBytes.length);
+                res.setHeader('Content-Length', finalAudioBytes.length);
 
                 // Send the audio data
-                res.send(Buffer.from(audioBytes));
+                res.send(Buffer.from(finalAudioBytes));
 
-                logger.info(`Successfully generated ${audioBytes.length} bytes of audio`);
+                logger.info(`Successfully generated ${finalAudioBytes.length} bytes of audio (${contentType})`);
 
             } catch (ttsError) {
                 logger.error(`TTS generation failed:`, ttsError);
@@ -624,7 +663,7 @@ class ProxyServer {
     async getUser(req, res) {
         try {
             logger.info('Getting user info');
-            
+
             // Return mock user data
             res.json({
                 subscription: {
@@ -648,9 +687,59 @@ class ProxyServer {
                 xi_api_key: "mock-api-key",
                 can_use_delayed_payment_methods: false
             });
-            
+
         } catch (error) {
             logger.error('Error getting user:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async getModels(req, res) {
+        try {
+            logger.info('Getting models info');
+
+            // Return mock models data that matches ElevenLabs API format
+            res.json([
+                {
+                    model_id: "eleven_monolingual_v1",
+                    name: "Eleven Monolingual v1",
+                    can_be_finetuned: true,
+                    can_do_text_to_speech: true,
+                    can_do_voice_conversion: false,
+                    can_use_style: false,
+                    can_use_speaker_boost: true,
+                    serves_pro_voices: false,
+                    language: {
+                        language_id: "en",
+                        name: "English"
+                    },
+                    description: "Use our standard English language model to generate speech in a variety of voices, styles and moods.",
+                    requires_alpha_access: false,
+                    max_characters_request_free_user: 500,
+                    max_characters_request_subscribed_user: 5000
+                },
+                {
+                    model_id: "eleven_multilingual_v2",
+                    name: "Eleven Multilingual v2",
+                    can_be_finetuned: true,
+                    can_do_text_to_speech: true,
+                    can_do_voice_conversion: false,
+                    can_use_style: true,
+                    can_use_speaker_boost: true,
+                    serves_pro_voices: true,
+                    language: {
+                        language_id: "multi",
+                        name: "Multilingual"
+                    },
+                    description: "Cutting edge multilingual speech synthesis, supporting 29 languages.",
+                    requires_alpha_access: false,
+                    max_characters_request_free_user: 500,
+                    max_characters_request_subscribed_user: 5000
+                }
+            ]);
+
+        } catch (error) {
+            logger.error('Error getting models:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     }
