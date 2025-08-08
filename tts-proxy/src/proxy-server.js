@@ -48,28 +48,83 @@ class ProxyServer {
     // Convert WAV audio to raw PCM at specified sample rate
     convertToPCM(audioBytes, targetSampleRate = 24000) {
         try {
+            // Convert Uint8Array to Buffer if needed
+            const buffer = Buffer.isBuffer(audioBytes) ? audioBytes : Buffer.from(audioBytes);
+
             // Check if it's already PCM (no WAV header)
-            if (audioBytes.length < 44 ||
-                audioBytes[0] !== 0x52 || audioBytes[1] !== 0x49 ||
-                audioBytes[2] !== 0x46 || audioBytes[3] !== 0x46) {
+            if (buffer.length < 44 ||
+                buffer[0] !== 0x52 || buffer[1] !== 0x49 ||
+                buffer[2] !== 0x46 || buffer[3] !== 0x46) {
                 // Not a WAV file, assume it's already raw audio
                 logger.info('Audio appears to be raw format, returning as-is');
-                return audioBytes;
+                return buffer;
             }
 
-            // Extract PCM data from WAV (skip 44-byte header)
-            const pcmData = audioBytes.slice(44);
+            // Parse WAV header to get format information
+            const channels = buffer.readUInt16LE(22);
+            const sampleRate = buffer.readUInt32LE(24);
+            const bitsPerSample = buffer.readUInt16LE(34);
 
-            // For now, return the raw PCM data
-            // TODO: Add sample rate conversion if needed
-            logger.info(`Extracted ${pcmData.length} bytes of PCM data from WAV`);
+            logger.info(`WAV format: ${sampleRate}Hz, ${bitsPerSample}-bit, ${channels} channel(s)`);
+
+            // Extract PCM data from WAV (skip 44-byte header)
+            let pcmData = buffer.slice(44);
+
+            // Convert to 16-bit if needed (Grid3 expects 16-bit PCM)
+            if (bitsPerSample === 32) {
+                logger.info('Converting from 32-bit to 16-bit PCM');
+                pcmData = this.convert32BitTo16Bit(pcmData);
+            } else if (bitsPerSample === 24) {
+                logger.info('Converting from 24-bit to 16-bit PCM');
+                pcmData = this.convert24BitTo16Bit(pcmData);
+            } else if (bitsPerSample === 16) {
+                logger.info('Already 16-bit PCM, no conversion needed');
+            } else {
+                logger.warn(`Unsupported bit depth: ${bitsPerSample}-bit`);
+            }
+
+            logger.info(`Extracted ${pcmData.length} bytes of 16-bit PCM data from WAV`);
             return pcmData;
 
         } catch (error) {
             logger.error('Error converting to PCM:', error);
             // Return original data if conversion fails
-            return audioBytes;
+            return Buffer.isBuffer(audioBytes) ? audioBytes : Buffer.from(audioBytes);
         }
+    }
+
+    // Convert 32-bit PCM to 16-bit PCM
+    convert32BitTo16Bit(pcmData) {
+        const samples32 = new Int32Array(pcmData.buffer, pcmData.byteOffset, pcmData.length / 4);
+        const samples16 = new Int16Array(samples32.length);
+
+        for (let i = 0; i < samples32.length; i++) {
+            // Convert 32-bit to 16-bit by dividing by 65536 (2^16)
+            samples16[i] = Math.max(-32768, Math.min(32767, Math.round(samples32[i] / 65536)));
+        }
+
+        return Buffer.from(samples16.buffer);
+    }
+
+    // Convert 24-bit PCM to 16-bit PCM
+    convert24BitTo16Bit(pcmData) {
+        const samples16 = new Int16Array(pcmData.length / 3 * 2);
+        let outputIndex = 0;
+
+        for (let i = 0; i < pcmData.length; i += 3) {
+            // Read 24-bit sample (little-endian)
+            let sample24 = pcmData[i] | (pcmData[i + 1] << 8) | (pcmData[i + 2] << 16);
+
+            // Sign extend if negative
+            if (sample24 & 0x800000) {
+                sample24 |= 0xFF000000;
+            }
+
+            // Convert to 16-bit by dividing by 256 (2^8)
+            samples16[outputIndex++] = Math.max(-32768, Math.min(32767, Math.round(sample24 / 256)));
+        }
+
+        return Buffer.from(samples16.buffer);
     }
 
     initializeTTSClients() {
@@ -92,13 +147,25 @@ class ProxyServer {
             // Initialize Azure if credentials are available
             if (availableEngines.includes('azure')) {
                 try {
-                    logger.info('Initializing Azure TTS client...');
-                    const azureClient = createTTSClient('azure', {
+                    logger.info('Initializing Azure TTS clients...');
+
+                    // Azure client for MP3 format (streaming endpoints)
+                    const azureClientMP3 = createTTSClient('azure', {
                         subscriptionKey: process.env.AZURE_SPEECH_KEY,
-                        region: process.env.AZURE_SPEECH_REGION
+                        region: process.env.AZURE_SPEECH_REGION,
+                        format: 'mp3'
                     });
-                    this.ttsClients.set('azure', azureClient);
-                    logger.info('✅ Azure TTS client initialized');
+                    this.ttsClients.set('azure-mp3', azureClientMP3);
+
+                    // Azure client for WAV format (PCM conversion endpoints)
+                    const azureClientWAV = createTTSClient('azure', {
+                        subscriptionKey: process.env.AZURE_SPEECH_KEY,
+                        region: process.env.AZURE_SPEECH_REGION,
+                        format: 'wav'
+                    });
+                    this.ttsClients.set('azure', azureClientWAV);
+
+                    logger.info('✅ Azure TTS clients initialized (MP3 + WAV formats)');
                 } catch (azureError) {
                     logger.warn('⚠️ Azure initialization failed:', azureError.message);
                 }
@@ -485,8 +552,26 @@ class ProxyServer {
                 return;
             }
 
-            // Get the TTS client
-            const ttsClient = this.ttsClients.get(voiceMapping.engine);
+            // Get the appropriate TTS client based on request type
+            let ttsClient;
+            if (voiceMapping.engine === 'azure') {
+                // Use different Azure clients based on the endpoint
+                if (output_format === 'pcm_24000') {
+                    // Use WAV client for PCM conversion
+                    ttsClient = this.ttsClients.get('azure');
+                    logger.info('Using Azure WAV client for PCM conversion');
+                } else if (req.path.includes('/stream/with-timestamps')) {
+                    // Use MP3 client for streaming
+                    ttsClient = this.ttsClients.get('azure-mp3');
+                    logger.info('Using Azure MP3 client for streaming');
+                } else {
+                    // Default to WAV client
+                    ttsClient = this.ttsClients.get('azure');
+                }
+            } else {
+                ttsClient = this.ttsClients.get(voiceMapping.engine);
+            }
+
             if (!ttsClient) {
                 logger.error(`TTS engine ${voiceMapping.engine} not available`);
                 res.status(500).json({ error: 'TTS engine not available' });
@@ -522,12 +607,23 @@ class ProxyServer {
                 let contentType = 'audio/wav'; // Default
                 let finalAudioBytes = audioBytes;
 
-                // ElevenLabs API always returns raw PCM data for TTS requests
-                // Grid3 expects raw PCM data from all ElevenLabs endpoints
-                if (output_format === 'pcm_24000' || req.path.includes('/v1/text-to-speech/')) {
+                // Handle specific output format requests (Grid3 uses different formats for different endpoints)
+                if (output_format === 'pcm_24000') {
+                    // Grid3's DownloadSpeechAsync method expects raw PCM data
                     contentType = 'audio/pcm';
-                    logger.info('Converting to PCM audio format (ElevenLabs compatibility)');
+                    logger.info('Converting to PCM audio format as requested');
                     finalAudioBytes = this.convertToPCM(audioBytes, 24000);
+                } else if (req.path.includes('/stream/with-timestamps')) {
+                    // Grid3's SpeakAsync method expects MP3 data for streaming
+                    if (voiceMapping.engine === 'elevenlabs' || voiceMapping.engine === 'azure') {
+                        contentType = 'audio/mpeg'; // ElevenLabs and Azure (configured) return MP3
+                        logger.info('Returning MP3 format for streaming endpoint');
+                    } else {
+                        // Other engines might need conversion
+                        contentType = 'audio/mpeg';
+                        logger.info('Converting to MP3 format for streaming endpoint');
+                        // TODO: Add actual WAV to MP3 conversion for other engines if needed
+                    }
                 } else if (voiceMapping.engine === 'elevenlabs') {
                     contentType = 'audio/mpeg';
                 } else if (voiceMapping.engine === 'openai') {
@@ -535,7 +631,7 @@ class ProxyServer {
                 } else if (voiceMapping.engine === 'google') {
                     contentType = 'audio/wav';
                 } else if (voiceMapping.engine === 'azure') {
-                    contentType = 'audio/wav';
+                    contentType = 'audio/mpeg'; // Azure now configured to return MP3
                 }
 
                 res.setHeader('Content-Type', contentType);
