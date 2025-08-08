@@ -648,32 +648,74 @@ class ProxyServer {
                     ttsClient.setVoice(voiceMapping.voiceId);
                 }
 
-                // Generate speech - ensure we get bytes, not play audio
+                // Generate speech - check if we need timestamps for streaming endpoint
                 logger.info(`Generating speech with ${voiceMapping.engine} engine...`);
 
                 let audioBytes;
-                if (ttsClient.synthToBytes) {
-                    // Prepare synthesis options based on the request
-                    const synthOptions = {};
+                let wordBoundaries = [];
 
-                    // For ElevenLabs, set the correct format based on the request
+                // For /stream/with-timestamps endpoint, use synthToBytestream to get timing data
+                if (req.path.includes('/stream/with-timestamps') && ttsClient.synthToBytestream) {
+                    logger.info('🎯 Using synthToBytestream for timestamp data...');
+
+                    const synthOptions = {};
                     if (voiceMapping.engine === 'elevenlabs') {
-                        if (output_format === 'pcm_24000') {
-                            synthOptions.format = 'pcm'; // This will use pcm_44100 in js-tts-wrapper
-                            logger.info('🔧 ElevenLabs: Requesting PCM format');
-                        } else {
-                            synthOptions.format = 'mp3'; // This will use mp3_44100_128 in js-tts-wrapper
-                            logger.info('🔧 ElevenLabs: Requesting MP3 format');
+                        synthOptions.format = 'mp3';
+                        logger.info('🔧 ElevenLabs: Requesting MP3 format for streaming');
+                    }
+
+                    const result = await ttsClient.synthToBytestream(text, synthOptions);
+
+                    // Convert stream to bytes
+                    if (result.audioStream) {
+                        const reader = result.audioStream.getReader();
+                        const chunks = [];
+                        let done = false;
+
+                        while (!done) {
+                            const { value, done: streamDone } = await reader.read();
+                            done = streamDone;
+                            if (value) {
+                                chunks.push(value);
+                            }
+                        }
+
+                        audioBytes = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
+                        let offset = 0;
+                        for (const chunk of chunks) {
+                            audioBytes.set(chunk, offset);
+                            offset += chunk.length;
                         }
                     }
 
-                    audioBytes = await ttsClient.synthToBytes(text, synthOptions);
-                } else if (ttsClient.synth) {
-                    // Some engines might only have synth method
-                    const audioBuffer = await ttsClient.synth(text);
-                    audioBytes = new Uint8Array(audioBuffer);
+                    wordBoundaries = result.wordBoundaries || [];
+                    logger.info(`Got ${wordBoundaries.length} word boundaries from js-tts-wrapper`);
+
                 } else {
-                    throw new Error('TTS client does not support audio synthesis');
+                    // Regular synthesis without timestamps
+                    if (ttsClient.synthToBytes) {
+                        // Prepare synthesis options based on the request
+                        const synthOptions = {};
+
+                        // For ElevenLabs, set the correct format based on the request
+                        if (voiceMapping.engine === 'elevenlabs') {
+                            if (output_format === 'pcm_24000') {
+                                synthOptions.format = 'pcm'; // This will use pcm_44100 in js-tts-wrapper
+                                logger.info('🔧 ElevenLabs: Requesting PCM format');
+                            } else {
+                                synthOptions.format = 'mp3'; // This will use mp3_44100_128 in js-tts-wrapper
+                                logger.info('🔧 ElevenLabs: Requesting MP3 format');
+                            }
+                        }
+
+                        audioBytes = await ttsClient.synthToBytes(text, synthOptions);
+                    } else if (ttsClient.synth) {
+                        // Some engines might only have synth method
+                        const audioBuffer = await ttsClient.synth(text);
+                        audioBytes = new Uint8Array(audioBuffer);
+                    } else {
+                        throw new Error('TTS client does not support audio synthesis');
+                    }
                 }
 
                 // Ensure we have valid audio data
@@ -692,16 +734,64 @@ class ProxyServer {
                     logger.info('Converting to PCM audio format as requested');
                     finalAudioBytes = this.convertToPCM(audioBytes, 24000);
                 } else if (req.path.includes('/stream/with-timestamps')) {
-                    // Grid3's SpeakAsync method expects MP3 data for streaming
-                    if (voiceMapping.engine === 'elevenlabs' || voiceMapping.engine === 'azure') {
-                        contentType = 'audio/mpeg'; // ElevenLabs and Azure (configured) return MP3
-                        logger.info('Returning MP3 format for streaming endpoint');
+                    // 🚨 CRITICAL FIX: ElevenLabs /stream/with-timestamps returns JSON with base64 audio!
+                    // Grid3 expects JSON format: {"audio_base64": "...", "alignment": {...}}
+
+                    // Convert audio bytes to base64 (ensure it's a Buffer first)
+                    const audioBuffer = Buffer.from(audioBytes);
+                    const audioBase64 = audioBuffer.toString('base64');
+
+                    // Convert js-tts-wrapper word boundaries to ElevenLabs character alignment format
+                    let alignment = null;
+                    if (wordBoundaries && wordBoundaries.length > 0) {
+                        logger.info(`Converting ${wordBoundaries.length} word boundaries to character alignment`);
+
+                        const characters = [];
+                        const characterStartTimes = [];
+                        const characterEndTimes = [];
+
+                        // Convert word boundaries to character-level timing
+                        for (const boundary of wordBoundaries) {
+                            const word = boundary.text;
+                            const startTime = boundary.offset / 1000; // Convert ms to seconds
+                            const endTime = (boundary.offset + boundary.duration) / 1000;
+                            const charDuration = (endTime - startTime) / word.length;
+
+                            // Add each character with interpolated timing
+                            for (let i = 0; i < word.length; i++) {
+                                characters.push(word[i]);
+                                characterStartTimes.push(startTime + (i * charDuration));
+                                characterEndTimes.push(startTime + ((i + 1) * charDuration));
+                            }
+                        }
+
+                        alignment = {
+                            characters,
+                            character_start_times_seconds: characterStartTimes,
+                            character_end_times_seconds: characterEndTimes
+                        };
                     } else {
-                        // Other engines might need conversion
-                        contentType = 'audio/mpeg';
-                        logger.info('Converting to MP3 format for streaming endpoint');
-                        // TODO: Add actual WAV to MP3 conversion for other engines if needed
+                        // Generate simple character timing if no word boundaries available
+                        logger.info('No word boundaries available, generating simple character timing');
+                        const characters = text.split('');
+                        alignment = {
+                            characters,
+                            character_start_times_seconds: characters.map((_, i) => i * 0.1),
+                            character_end_times_seconds: characters.map((_, i) => (i + 1) * 0.1)
+                        };
                     }
+
+                    // Create ElevenLabs-compatible JSON response
+                    const jsonResponse = {
+                        audio_base64: audioBase64,
+                        alignment: alignment,
+                        normalized_alignment: null
+                    };
+
+                    finalAudioBytes = Buffer.from(JSON.stringify(jsonResponse));
+                    contentType = 'application/json';
+                    logger.info('🎯 CRITICAL FIX: Returning JSON with base64 audio for streaming endpoint');
+                    logger.info(`JSON response size: ${finalAudioBytes.length} bytes, audio_base64 size: ${audioBase64.length} chars`);
                 } else if (voiceMapping.engine === 'elevenlabs') {
                     contentType = 'audio/mpeg';
                 } else if (voiceMapping.engine === 'openai') {
