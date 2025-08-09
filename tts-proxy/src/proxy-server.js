@@ -12,6 +12,9 @@ const AuthMiddleware = require('./auth-middleware');
 const SecurityMiddleware = require('./security-middleware');
 const pcmConvert = require('pcm-convert');
 
+// Debug audio playback imports (loaded when needed)
+let Speaker, wav;
+
 class ProxyServer {
     constructor(port = 3000) {
         this.port = port;
@@ -21,6 +24,9 @@ class ProxyServer {
 
         // Load environment variables first
         this.envLoader = new EnvironmentLoader();
+
+        // Initialize debug audio playback after environment variables are loaded
+        this.initializeDebugAudio();
 
         // Initialize configuration (use production config in production)
         if (process.env.NODE_ENV === 'production') {
@@ -49,6 +55,151 @@ class ProxyServer {
     }
 
     // Convert WAV audio to raw PCM at specified sample rate
+    /**
+     * Initialize debug audio playback feature
+     */
+    initializeDebugAudio() {
+        const DEBUG_PLAY_AUDIO = process.env.DEBUG_PLAY_AUDIO === 'true';
+        this.debugPlayAudio = DEBUG_PLAY_AUDIO;
+
+        console.log('DEBUG_PLAY_AUDIO environment variable:', DEBUG_PLAY_AUDIO);
+        if (DEBUG_PLAY_AUDIO) {
+            try {
+                Speaker = require('speaker');
+                wav = require('node-wav');
+                console.log('🔊 Debug audio playback enabled');
+                logger.info('🔊 Debug audio playback enabled');
+            } catch (error) {
+                console.log('⚠️ Debug audio playback requested but libraries not available:', error.message);
+                logger.warn('⚠️ Debug audio playback requested but libraries not available:', error.message);
+                this.debugPlayAudio = false;
+            }
+        } else {
+            console.log('🔇 Debug audio playback disabled');
+        }
+    }
+
+    /**
+     * Debug function to play audio locally for timing verification
+     * @param {Buffer} audioBytes - Audio data to play
+     * @param {string} format - Audio format ('mp3', 'wav', 'pcm')
+     * @param {string} text - Text that was synthesized (for logging)
+     */
+    debugPlayAudioFile(audioBytes, format, text) {
+        if (!this.debugPlayAudio || !Speaker || !wav) {
+            return;
+        }
+
+        try {
+            // Auto-detect actual audio format from file header
+            const buffer = Buffer.from(audioBytes);
+            let actualFormat = format;
+
+            if (buffer.length >= 4) {
+                const header = buffer.slice(0, 4).toString('ascii');
+                if (header === 'RIFF') {
+                    actualFormat = 'wav';
+                    logger.info(`🔊 DEBUG: Auto-detected WAV format (was labeled as ${format})`);
+                } else if (buffer[0] === 0xFF && (buffer[1] & 0xE0) === 0xE0) {
+                    actualFormat = 'mp3';
+                    logger.info(`🔊 DEBUG: Auto-detected MP3 format (was labeled as ${format})`);
+                } else if (buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33) {
+                    actualFormat = 'mp3'; // ID3 tag
+                    logger.info(`🔊 DEBUG: Auto-detected MP3 with ID3 tag (was labeled as ${format})`);
+                }
+            }
+
+            logger.info(`🔊 DEBUG: Playing audio for text: "${text}" (${actualFormat} format, ${audioBytes.length} bytes)`);
+
+            if (actualFormat === 'mp3') {
+                // For MP3, we'll save to temp file and let the system play it
+                // This is simpler than decoding MP3 in Node.js
+                const tempFile = path.join(__dirname, '..', `debug-audio.mp3`);
+                require('fs').writeFileSync(tempFile, audioBytes);
+                logger.info(`🔊 DEBUG: Saved MP3 to ${tempFile} - play manually to verify timing`);
+
+                // Try to play using system command (Windows)
+                if (process.platform === 'win32') {
+                    const { spawn } = require('child_process');
+                    const player = spawn('powershell', ['-c', `(New-Object Media.SoundPlayer '${tempFile}').PlaySync()`], {
+                        stdio: 'ignore',
+                        detached: true
+                    });
+                    player.unref();
+                }
+
+            } else if (actualFormat === 'wav') {
+                // Save WAV file for manual verification
+                const tempFile = path.join(__dirname, '..', `debug-audio.wav`);
+                require('fs').writeFileSync(tempFile, audioBytes);
+                logger.info(`🔊 DEBUG: Saved WAV to ${tempFile} - play manually to verify timing`);
+
+                // Try multiple playback methods
+                let playbackSuccess = false;
+
+                // Method 1: Try Windows system audio player first (more reliable)
+                if (process.platform === 'win32') {
+                    try {
+                        const { spawn } = require('child_process');
+                        const player = spawn('cmd', ['/c', `start /min "" "${tempFile}"`], {
+                            stdio: 'ignore',
+                            detached: true
+                        });
+
+                        player.unref();
+                        logger.info(`🔊 DEBUG: Playing WAV audio via Windows system player`);
+                        playbackSuccess = true;
+                    } catch (systemError) {
+                        logger.warn(`⚠️ DEBUG: Windows system player failed: ${systemError.message}`);
+                    }
+                }
+
+                // Method 2: Fallback to Node.js Speaker (if system player failed)
+                if (!playbackSuccess) {
+                    try {
+                        const decoded = wav.decode(audioBytes);
+                        const speaker = new Speaker({
+                            channels: decoded.channelData.length,
+                            bitDepth: 16,
+                            sampleRate: decoded.sampleRate
+                        });
+
+                        // Convert float32 to int16 for speaker
+                        const samples = decoded.channelData[0];
+                        const buffer = Buffer.alloc(samples.length * 2);
+                        for (let i = 0; i < samples.length; i++) {
+                            const sample = Math.max(-1, Math.min(1, samples[i]));
+                            buffer.writeInt16LE(sample * 32767, i * 2);
+                        }
+
+                        speaker.write(buffer);
+                        speaker.end();
+                        logger.info(`🔊 DEBUG: Playing WAV audio via Node.js Speaker (${decoded.sampleRate}Hz, ${decoded.channelData.length} channels)`);
+                        playbackSuccess = true;
+                    } catch (playError) {
+                        logger.warn(`⚠️ DEBUG: Node.js Speaker playback failed: ${playError.message}`);
+                    }
+                }
+
+
+            } else if (actualFormat === 'pcm') {
+                // Play raw PCM data
+                const speaker = new Speaker({
+                    channels: 1,
+                    bitDepth: 16,
+                    sampleRate: 24000
+                });
+
+                speaker.write(audioBytes);
+                speaker.end();
+                logger.info(`🔊 DEBUG: Playing PCM audio (24000Hz, 16-bit, mono)`);
+            }
+
+        } catch (error) {
+            logger.warn(`⚠️ DEBUG: Failed to play audio: ${error.message}`);
+        }
+    }
+
     convertToPCM(audioBytes, targetSampleRate = 24000) {
         try {
             // Convert Uint8Array to Buffer if needed
@@ -653,43 +804,61 @@ class ProxyServer {
 
                 let audioBytes;
                 let wordBoundaries = [];
+                let elevenLabsTimingData = null;
 
-                // For /stream/with-timestamps endpoint, use synthToBytestream to get timing data
-                if (req.path.includes('/stream/with-timestamps') && ttsClient.synthToBytestream) {
-                    logger.info('🎯 Using synthToBytestream for timestamp data...');
+                // For /stream/with-timestamps endpoint, use appropriate method for timing data
+                if (req.path.includes('/stream/with-timestamps')) {
+                    logger.info('🎯 Using timestamp-enabled synthesis...');
 
-                    const synthOptions = {};
-                    if (voiceMapping.engine === 'elevenlabs') {
-                        synthOptions.format = 'mp3';
-                        logger.info('🔧 ElevenLabs: Requesting MP3 format for streaming');
-                    }
+                    let result;
 
-                    const result = await ttsClient.synthToBytestream(text, synthOptions);
+                    if (voiceMapping.engine === 'elevenlabs' && ttsClient.synthWithTimestamps) {
+                        // Use ElevenLabs WebSocket API for real character timing
+                        logger.info('🔧 ElevenLabs: Using synthWithTimestamps for real character timing');
+                        result = await ttsClient.synthWithTimestamps(text, voiceMapping.voiceId);
 
-                    // Convert stream to bytes
-                    if (result.audioStream) {
-                        const reader = result.audioStream.getReader();
-                        const chunks = [];
-                        let done = false;
+                        // Convert ElevenLabs response format
+                        if (result.audio_base64) {
+                            audioBytes = Buffer.from(result.audio_base64, 'base64');
+                        }
 
-                        while (!done) {
-                            const { value, done: streamDone } = await reader.read();
-                            done = streamDone;
-                            if (value) {
-                                chunks.push(value);
+                        // Extract real character timing from ElevenLabs
+                        if (result.alignment && result.alignment.characters) {
+                            logger.info(`🎯 Got REAL ElevenLabs character timing: ${result.alignment.characters.length} characters`);
+                            elevenLabsTimingData = result.alignment;
+                        }
+
+                    } else if (ttsClient.synthToBytestream) {
+                        // Use synthToBytestream for other engines
+                        logger.info('🔧 Using synthToBytestream for word boundaries');
+                        const synthOptions = {};
+                        result = await ttsClient.synthToBytestream(text, synthOptions);
+
+                        // Convert stream to bytes (for non-ElevenLabs engines)
+                        if (result.audioStream) {
+                            const reader = result.audioStream.getReader();
+                            const chunks = [];
+                            let done = false;
+
+                            while (!done) {
+                                const { value, done: streamDone } = await reader.read();
+                                done = streamDone;
+                                if (value) {
+                                    chunks.push(value);
+                                }
+                            }
+
+                            audioBytes = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
+                            let offset = 0;
+                            for (const chunk of chunks) {
+                                audioBytes.set(chunk, offset);
+                                offset += chunk.length;
                             }
                         }
 
-                        audioBytes = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
-                        let offset = 0;
-                        for (const chunk of chunks) {
-                            audioBytes.set(chunk, offset);
-                            offset += chunk.length;
-                        }
+                        wordBoundaries = result.wordBoundaries || [];
+                        logger.info(`Got ${wordBoundaries.length} word boundaries from js-tts-wrapper`);
                     }
-
-                    wordBoundaries = result.wordBoundaries || [];
-                    logger.info(`Got ${wordBoundaries.length} word boundaries from js-tts-wrapper`);
 
                 } else {
                     // Regular synthesis without timestamps
@@ -741,9 +910,27 @@ class ProxyServer {
                     const audioBuffer = Buffer.from(audioBytes);
                     const audioBase64 = audioBuffer.toString('base64');
 
-                    // Convert js-tts-wrapper word boundaries to ElevenLabs character alignment format
+                    // Handle character alignment - either from real ElevenLabs data or converted from word boundaries
                     let alignment = null;
-                    if (wordBoundaries && wordBoundaries.length > 0) {
+
+                    // Check if we have real ElevenLabs character timing data
+                    if (elevenLabsTimingData && elevenLabsTimingData.characters) {
+                        logger.info(`🎯 Using REAL ElevenLabs character timing: ${elevenLabsTimingData.characters.length} characters`);
+
+                        alignment = {
+                            characters: elevenLabsTimingData.characters,
+                            character_start_times_seconds: elevenLabsTimingData.character_start_times_seconds,
+                            character_end_times_seconds: elevenLabsTimingData.character_end_times_seconds
+                        };
+
+                        logger.info('Real ElevenLabs timing sample:', {
+                            chars: alignment.characters.slice(0, 10),
+                            starts: alignment.character_start_times_seconds.slice(0, 10),
+                            ends: alignment.character_end_times_seconds.slice(0, 10)
+                        });
+
+                    } else if (wordBoundaries && wordBoundaries.length > 0) {
+                        // Fallback: Convert word boundaries to character alignment
                         logger.info(`Converting ${wordBoundaries.length} word boundaries to character alignment`);
                         logger.info('Word boundaries:', wordBoundaries.map(b => ({ text: b.text, offset: b.offset, duration: b.duration })));
 
@@ -772,8 +959,8 @@ class ProxyServer {
                             character_end_times_seconds: characterEndTimes
                         };
                     } else {
-                        // Generate realistic character timing matching real ElevenLabs patterns
-                        logger.info('No word boundaries available, generating ElevenLabs-style character timing');
+                        // Fallback: Generate realistic character timing matching real ElevenLabs patterns
+                        logger.info('No timing data available, generating ElevenLabs-style character timing');
                         const characters = text.split('');
 
                         // Real ElevenLabs timing analysis for "Hello world test" (16 chars, 1.486s):
@@ -838,6 +1025,14 @@ class ProxyServer {
                     contentType = 'application/json';
                     logger.info('🎯 CRITICAL FIX: Returning JSON with base64 audio for streaming endpoint');
                     logger.info(`JSON response size: ${finalAudioBytes.length} bytes, audio_base64 size: ${audioBase64.length} chars`);
+
+                    // Debug: Play the audio to verify timing
+                    if (this.debugPlayAudio) {
+                        const audioFormat = voiceMapping.engine === 'elevenlabs' ? 'mp3' :
+                                          voiceMapping.engine === 'azure' ? 'mp3' :
+                                          voiceMapping.engine === 'google' ? 'wav' : 'mp3';
+                        this.debugPlayAudioFile(audioBuffer, audioFormat, text);
+                    }
                 } else if (voiceMapping.engine === 'elevenlabs') {
                     contentType = 'audio/mpeg';
                 } else if (voiceMapping.engine === 'openai') {
@@ -855,6 +1050,14 @@ class ProxyServer {
                 res.send(Buffer.from(finalAudioBytes));
 
                 logger.info(`Successfully generated ${finalAudioBytes.length} bytes of audio (${contentType})`);
+
+                // Debug: Play the audio to verify timing (for non-streaming endpoints)
+                if (this.debugPlayAudio && !req.path.includes('/stream/with-timestamps')) {
+                    const audioFormat = contentType.includes('mpeg') ? 'mp3' :
+                                      contentType.includes('wav') ? 'wav' :
+                                      contentType.includes('pcm') ? 'pcm' : 'mp3';
+                    this.debugPlayAudioFile(finalAudioBytes, audioFormat, text);
+                }
 
             } catch (ttsError) {
                 logger.error(`TTS generation failed:`, ttsError);
