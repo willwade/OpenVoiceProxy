@@ -112,87 +112,86 @@ class ProxyServer {
             logger.info(`🔊 DEBUG: Playing audio for text: "${text}" (${actualFormat} format, ${audioBytes.length} bytes)`);
 
             if (actualFormat === 'mp3') {
-                // For MP3, we'll save to temp file and let the system play it
-                // This is simpler than decoding MP3 in Node.js
-                const tempFile = path.join(__dirname, '..', `debug-audio.mp3`);
-                require('fs').writeFileSync(tempFile, audioBytes);
-                logger.info(`🔊 DEBUG: Saved MP3 to ${tempFile} - play manually to verify timing`);
+                // For MP3, we need to decode it first, but that's complex with Node.js Speaker
+                // Use sound-play library as a simpler alternative for direct audio playback
+                try {
+                    const soundPlay = require('sound-play');
 
-                // Try to play using system command (Windows)
-                if (process.platform === 'win32') {
-                    const { spawn } = require('child_process');
-                    const player = spawn('powershell', ['-c', `(New-Object Media.SoundPlayer '${tempFile}').PlaySync()`], {
-                        stdio: 'ignore',
-                        detached: true
+                    // Create temporary file for sound-play
+                    const timestamp = Date.now();
+                    const tempFile = path.join(__dirname, '..', `debug-audio-${timestamp}.mp3`);
+                    require('fs').writeFileSync(tempFile, audioBytes);
+
+                    // Play using sound-play library (more reliable than system commands)
+                    soundPlay.play(tempFile).then(() => {
+                        logger.info(`🔊 DEBUG: Playing MP3 audio via sound-play library`);
+
+                        // Clean up after playback
+                        setTimeout(() => {
+                            try {
+                                require('fs').unlinkSync(tempFile);
+                                logger.info(`🔊 DEBUG: Cleaned up temp file ${tempFile}`);
+                            } catch (cleanupError) {
+                                // Ignore cleanup errors
+                            }
+                        }, 1000);
+                    }).catch((playError) => {
+                        logger.warn(`⚠️ DEBUG: sound-play failed: ${playError.message}`);
+
+                        // Clean up file even if playback failed
+                        try {
+                            require('fs').unlinkSync(tempFile);
+                        } catch (cleanupError) {
+                            // Ignore cleanup errors
+                        }
                     });
-                    player.unref();
+                } catch (soundPlayError) {
+                    logger.warn(`⚠️ DEBUG: sound-play library not available: ${soundPlayError.message}`);
                 }
 
             } else if (actualFormat === 'wav') {
-                // Save WAV file for manual verification
-                const tempFile = path.join(__dirname, '..', `debug-audio.wav`);
-                require('fs').writeFileSync(tempFile, audioBytes);
-                logger.info(`🔊 DEBUG: Saved WAV to ${tempFile} - play manually to verify timing`);
+                // Use Node.js Speaker library directly for WAV playback (like pyaudio)
+                try {
+                    const decoded = wav.decode(audioBytes);
+                    const speaker = new Speaker({
+                        channels: decoded.channelData.length,
+                        bitDepth: 16,
+                        sampleRate: decoded.sampleRate
+                    });
 
-                // Try multiple playback methods
-                let playbackSuccess = false;
-
-                // Method 1: Try Windows system audio player first (more reliable)
-                if (process.platform === 'win32') {
-                    try {
-                        const { spawn } = require('child_process');
-                        const player = spawn('cmd', ['/c', `start /min "" "${tempFile}"`], {
-                            stdio: 'ignore',
-                            detached: true
-                        });
-
-                        player.unref();
-                        logger.info(`🔊 DEBUG: Playing WAV audio via Windows system player`);
-                        playbackSuccess = true;
-                    } catch (systemError) {
-                        logger.warn(`⚠️ DEBUG: Windows system player failed: ${systemError.message}`);
+                    // Convert float32 to int16 for speaker
+                    const samples = decoded.channelData[0];
+                    const buffer = Buffer.alloc(samples.length * 2);
+                    for (let i = 0; i < samples.length; i++) {
+                        const sample = Math.max(-1, Math.min(1, samples[i]));
+                        buffer.writeInt16LE(sample * 32767, i * 2);
                     }
-                }
 
-                // Method 2: Fallback to Node.js Speaker (if system player failed)
-                if (!playbackSuccess) {
-                    try {
-                        const decoded = wav.decode(audioBytes);
-                        const speaker = new Speaker({
-                            channels: decoded.channelData.length,
-                            bitDepth: 16,
-                            sampleRate: decoded.sampleRate
-                        });
-
-                        // Convert float32 to int16 for speaker
-                        const samples = decoded.channelData[0];
-                        const buffer = Buffer.alloc(samples.length * 2);
-                        for (let i = 0; i < samples.length; i++) {
-                            const sample = Math.max(-1, Math.min(1, samples[i]));
-                            buffer.writeInt16LE(sample * 32767, i * 2);
-                        }
-
-                        speaker.write(buffer);
-                        speaker.end();
-                        logger.info(`🔊 DEBUG: Playing WAV audio via Node.js Speaker (${decoded.sampleRate}Hz, ${decoded.channelData.length} channels)`);
-                        playbackSuccess = true;
-                    } catch (playError) {
-                        logger.warn(`⚠️ DEBUG: Node.js Speaker playback failed: ${playError.message}`);
-                    }
+                    speaker.write(buffer);
+                    speaker.end();
+                    logger.info(`🔊 DEBUG: Playing WAV audio via Node.js Speaker (${decoded.sampleRate}Hz, ${decoded.channelData.length} channels)`);
+                } catch (playError) {
+                    logger.warn(`⚠️ DEBUG: WAV Speaker playback failed: ${playError.message}`);
                 }
 
 
             } else if (actualFormat === 'pcm') {
-                // Play raw PCM data
-                const speaker = new Speaker({
-                    channels: 1,
-                    bitDepth: 16,
-                    sampleRate: 24000
-                });
+                // Play raw PCM data directly through sound card using Node.js Speaker (like pyaudio)
+                try {
+                    const speaker = new Speaker({
+                        channels: 1,
+                        bitDepth: 16,
+                        sampleRate: 24000
+                    });
 
-                speaker.write(audioBytes);
-                speaker.end();
-                logger.info(`🔊 DEBUG: Playing PCM audio (24000Hz, 16-bit, mono)`);
+                    speaker.write(audioBytes);
+                    speaker.end();
+                    logger.info(`🔊 DEBUG: Playing PCM audio via Node.js Speaker (24000Hz, 16-bit, mono)`);
+                } catch (playError) {
+                    logger.warn(`⚠️ DEBUG: PCM Speaker playback failed: ${playError.message}`);
+                }
+
+
             }
 
         } catch (error) {
@@ -832,6 +831,13 @@ class ProxyServer {
                         // Use synthToBytestream for other engines
                         logger.info('🔧 Using synthToBytestream for word boundaries');
                         const synthOptions = {};
+
+                        // For Azure streaming endpoints, try to force MP3 format
+                        if (voiceMapping.engine === 'azure' && req.path.includes('/stream/with-timestamps')) {
+                            synthOptions.format = 'mp3';
+                            logger.info('🔧 Azure: Requesting MP3 format for streaming');
+                        }
+
                         result = await ttsClient.synthToBytestream(text, synthOptions);
 
                         // Convert stream to bytes (for non-ElevenLabs engines)
@@ -1014,25 +1020,40 @@ class ProxyServer {
                         logger.info(`Generated ElevenLabs-style timing: ${characters.length} chars over ${finalDuration.toFixed(2)}s (avg ${(finalDuration/characters.length*1000).toFixed(0)}ms/char)`);
                     }
 
-                    // Create ElevenLabs-compatible JSON response
+                    // 🎯 CRITICAL FIX: Grid3 expects JSON with base64 audio (like real ElevenLabs)!
+                    // Real ElevenLabs /stream/with-timestamps returns JSON, not binary MP3
+                    // IMPORTANT: Real ElevenLabs returns alignment: null, normalized_alignment: null
+
+                    logger.info('🎯 CRITICAL FIX: Returning JSON with base64 audio (matching real ElevenLabs exactly)');
                     const jsonResponse = {
-                        audio_base64: audioBase64,
-                        alignment: alignment,
-                        normalized_alignment: null
+                        audio_base64: audioBytes.toString('base64'),
+                        alignment: null,  // Real ElevenLabs returns null
+                        normalized_alignment: null  // Real ElevenLabs returns null
                     };
 
-                    finalAudioBytes = Buffer.from(JSON.stringify(jsonResponse));
+                    const jsonString = JSON.stringify(jsonResponse);
                     contentType = 'application/json';
-                    logger.info('🎯 CRITICAL FIX: Returning JSON with base64 audio for streaming endpoint');
-                    logger.info(`JSON response size: ${finalAudioBytes.length} bytes, audio_base64 size: ${audioBase64.length} chars`);
 
-                    // Debug: Play the audio to verify timing
+                    // 🎯 CRITICAL: Real ElevenLabs uses chunked transfer encoding
+                    // Send response using chunked encoding to match real ElevenLabs exactly
+                    res.setHeader('Content-Type', contentType);
+                    res.setHeader('Transfer-Encoding', 'chunked');
+
+                    logger.info(`JSON response size: ${jsonString.length} bytes, audio_base64 size: ${jsonResponse.audio_base64.length} chars`);
+
+                    // Debug: Play the audio to verify timing (before sending response)
                     if (this.debugPlayAudio) {
                         const audioFormat = voiceMapping.engine === 'elevenlabs' ? 'mp3' :
                                           voiceMapping.engine === 'azure' ? 'mp3' :
                                           voiceMapping.engine === 'google' ? 'wav' : 'mp3';
+                        // Use the original audioBuffer directly (don't re-decode from base64)
                         this.debugPlayAudioFile(audioBuffer, audioFormat, text);
                     }
+
+                    // Send the JSON response in chunks (like real ElevenLabs)
+                    res.write(jsonString);
+                    res.end();
+                    return;
                 } else if (voiceMapping.engine === 'elevenlabs') {
                     contentType = 'audio/mpeg';
                 } else if (voiceMapping.engine === 'openai') {
@@ -1051,8 +1072,9 @@ class ProxyServer {
 
                 logger.info(`Successfully generated ${finalAudioBytes.length} bytes of audio (${contentType})`);
 
-                // Debug: Play the audio to verify timing (for non-streaming endpoints)
-                if (this.debugPlayAudio && !req.path.includes('/stream/with-timestamps')) {
+                // Debug: Play the audio to verify timing (for non-streaming endpoints only)
+                // Note: Streaming endpoints already have debug playback above, so skip them here
+                if (this.debugPlayAudio && !req.path.includes('/stream') && !req.path.includes('/with-timestamps')) {
                     const audioFormat = contentType.includes('mpeg') ? 'mp3' :
                                       contentType.includes('wav') ? 'wav' :
                                       contentType.includes('pcm') ? 'pcm' : 'mp3';
