@@ -11,6 +11,7 @@ const DatabaseKeyManager = require('./database-key-manager');
 const AuthMiddleware = require('./auth-middleware');
 const SecurityMiddleware = require('./security-middleware');
 const pcmConvert = require('pcm-convert');
+const ESP32Endpoint = require('./esp32-endpoint');
 
 // Debug audio playback imports (loaded when needed)
 let Speaker, wav;
@@ -49,6 +50,10 @@ class ProxyServer {
 
         this.setupMiddleware();
         this.setupRoutes();
+
+        // ESP32 endpoint for embedded devices
+        this.esp32Endpoint = new ESP32Endpoint(this);
+        this.esp32Endpoint.register(this.app, this.authMiddleware);
 
         // Pre-populate voice mappings on startup
         this.initializeVoiceMappings();
