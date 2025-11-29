@@ -618,6 +618,17 @@ class ProxyServer {
             res.json(healthInfo);
         });
 
+        // OpenAPI/Swagger spec
+        this.app.get('/openapi.json', (req, res) => {
+            try {
+                const specPath = path.join(__dirname, '..', 'openapi.json');
+                res.sendFile(specPath);
+            } catch (error) {
+                logger.warn('Failed to serve OpenAPI spec:', error.message);
+                res.status(500).json({ error: 'Failed to load OpenAPI spec' });
+            }
+        });
+
         // Metrics endpoint (basic monitoring)
         this.app.get('/metrics', (req, res) => {
             const metrics = logger.getMetrics ? logger.getMetrics() : {};
