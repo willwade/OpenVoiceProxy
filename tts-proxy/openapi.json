@@ -1,0 +1,204 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OpenVoiceProxy",
+    "version": "1.0.0",
+    "description": "Unofficial ElevenLabs-compatible proxy with extra endpoints for embedded/ESP32 devices."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local server"
+    }
+  ],
+  "tags": [
+    { "name": "Health" },
+    { "name": "ElevenLabs API" },
+    { "name": "ESP32" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/voices": {
+      "get": {
+        "tags": ["ElevenLabs API"],
+        "summary": "List available voices",
+        "security": [
+          { "BearerAuth": [] },
+          { "ApiKeyAuth": [] }
+        ],
+        "responses": {
+          "200": {
+            "description": "Voice list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "voices": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/v1/text-to-speech/{voiceId}/stream/with-timestamps": {
+      "post": {
+        "tags": ["ElevenLabs API"],
+        "summary": "Text-to-speech with timestamps",
+        "security": [
+          { "BearerAuth": [] },
+          { "ApiKeyAuth": [] }
+        ],
+        "parameters": [
+          {
+            "name": "voiceId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": { "type": "string" },
+                  "model_id": { "type": "string" },
+                  "voice_settings": { "type": "object" }
+                },
+                "required": ["text"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Audio stream or JSON payload (engine-dependent)" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/v1/user": {
+      "get": {
+        "tags": ["ElevenLabs API"],
+        "summary": "User/subscription info",
+        "security": [
+          { "BearerAuth": [] },
+          { "ApiKeyAuth": [] }
+        ],
+        "responses": {
+          "200": { "description": "User info JSON" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/speak": {
+      "post": {
+        "tags": ["ESP32"],
+        "summary": "Lightweight TTS endpoint for embedded devices",
+        "security": [
+          { "ApiKeyAuth": [] },
+          { "BearerAuth": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": { "type": "string" },
+                  "voice": { "type": "string", "example": "en-US-JennyNeural" },
+                  "engine": { "type": "string", "example": "azure" },
+                  "ssml": { "type": "boolean", "default": false },
+                  "format": { "type": "string", "enum": ["pcm16", "wav", "mp3"], "default": "pcm16" },
+                  "sample_rate": { "type": "integer", "example": 16000 }
+                },
+                "required": ["text"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Audio bytes (Content-Type depends on format)" },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/voices": {
+      "get": {
+        "tags": ["ESP32"],
+        "summary": "List voices (all engines or one engine)",
+        "security": [
+          { "ApiKeyAuth": [] },
+          { "BearerAuth": [] }
+        ],
+        "parameters": [
+          {
+            "name": "engine",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Voice list JSON" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/engines": {
+      "get": {
+        "tags": ["ESP32"],
+        "summary": "List available engines",
+        "security": [
+          { "ApiKeyAuth": [] },
+          { "BearerAuth": [] }
+        ],
+        "responses": {
+          "200": { "description": "Engine list JSON" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
