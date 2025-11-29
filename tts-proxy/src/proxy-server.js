@@ -48,12 +48,12 @@ class ProxyServer {
         this.initializeTTSClients();
         this.loadVoiceMappings();
 
-        this.setupMiddleware();
-        this.setupRoutes();
-
         // ESP32 endpoint for embedded devices
         this.esp32Endpoint = new ESP32Endpoint(this);
+
+        this.setupMiddleware();
         this.esp32Endpoint.register(this.app, this.authMiddleware);
+        this.setupRoutes();
 
         // Pre-populate voice mappings on startup
         this.initializeVoiceMappings();
@@ -352,7 +352,10 @@ class ProxyServer {
             if (availableEngines.includes('google')) {
                 try {
                     logger.info('Initializing Google TTS client...');
-                    const googleClient = createTTSClient('google');
+                    const googleClient = createTTSClient('google', {
+                        keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+                        apiKey: process.env.GOOGLECLOUDTTS_API_KEY
+                    });
                     this.ttsClients.set('google', googleClient);
                     logger.info('✅ Google TTS client initialized');
                 } catch (googleError) {
@@ -361,13 +364,15 @@ class ProxyServer {
             }
 
             // Initialize AWS Polly if credentials are available
-            if (availableEngines.includes('aws-polly')) {
+            if (availableEngines.includes('polly')) {
                 try {
                     logger.info('Initializing AWS Polly TTS client...');
-                    const pollyClient = createTTSClient('aws-polly', {
-                        region: process.env.AWS_REGION || 'us-east-1'
+                    const pollyClient = createTTSClient('polly', {
+                        region: process.env.AWS_REGION || 'us-east-1',
+                        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
                     });
-                    this.ttsClients.set('aws-polly', pollyClient);
+                    this.ttsClients.set('polly', pollyClient);
                     logger.info('✅ AWS Polly TTS client initialized');
                 } catch (pollyError) {
                     logger.warn('⚠️ AWS Polly initialization failed:', pollyError.message);
@@ -399,6 +404,95 @@ class ProxyServer {
                     logger.info('✅ OpenAI TTS client initialized');
                 } catch (openaiError) {
                     logger.warn('⚠️ OpenAI initialization failed:', openaiError.message);
+                }
+            }
+
+            // Initialize PlayHT if API key is available
+            if (availableEngines.includes('playht')) {
+                try {
+                    logger.info('Initializing PlayHT TTS client...');
+                    const playhtClient = createTTSClient('playht', {
+                        apiKey: process.env.PLAYHT_API_KEY,
+                        userId: process.env.PLAYHT_USER_ID
+                    });
+                    this.ttsClients.set('playht', playhtClient);
+                    logger.info('✅ PlayHT TTS client initialized');
+                } catch (playhtError) {
+                    logger.warn('⚠️ PlayHT initialization failed:', playhtError.message);
+                }
+            }
+
+            // Initialize IBM Watson if credentials are available
+            if (availableEngines.includes('watson')) {
+                try {
+                    logger.info('Initializing IBM Watson TTS client...');
+                    const watsonClient = createTTSClient('watson', {
+                        apiKey: process.env.WATSON_API_KEY,
+                        region: process.env.WATSON_REGION,
+                        instanceId: process.env.WATSON_INSTANCE_ID,
+                        url: process.env.WATSON_API_URL
+                    });
+                    this.ttsClients.set('watson', watsonClient);
+                    logger.info('✅ IBM Watson TTS client initialized');
+                } catch (watsonError) {
+                    logger.warn('⚠️ IBM Watson initialization failed:', watsonError.message);
+                }
+            }
+
+            // Initialize Wit.ai if token is available
+            if (availableEngines.includes('witai')) {
+                try {
+                    logger.info('Initializing Wit.ai TTS client...');
+                    const witaiClient = createTTSClient('witai', {
+                        token: process.env.WITAI_TOKEN
+                    });
+                    this.ttsClients.set('witai', witaiClient);
+                    logger.info('✅ Wit.ai TTS client initialized');
+                } catch (witaiError) {
+                    logger.warn('⚠️ Wit.ai initialization failed:', witaiError.message);
+                }
+            }
+
+            // Initialize UpLiftAI if API key is available
+            if (availableEngines.includes('upliftai')) {
+                try {
+                    logger.info('Initializing UpLiftAI TTS client...');
+                    const upliftClient = createTTSClient('upliftai', {
+                        apiKey: process.env.UPLIFTAI_API_KEY
+                    });
+                    this.ttsClients.set('upliftai', upliftClient);
+                    logger.info('✅ UpLiftAI TTS client initialized');
+                } catch (upliftError) {
+                    logger.warn('⚠️ UpLiftAI initialization failed:', upliftError.message);
+                }
+            }
+
+            // Initialize SherpaOnnx (node-only offline engine)
+            if (availableEngines.includes('sherpaonnx')) {
+                try {
+                    logger.info('Initializing SherpaOnnx TTS client...');
+                    const sherpaOptions = {
+                        modelPath: process.env.SHERPAONNX_MODEL_PATH,
+                        modelId: process.env.SHERPAONNX_MODEL_ID,
+                        noDefaultDownload: process.env.SHERPAONNX_NO_DEFAULT_DOWNLOAD === 'true'
+                    };
+                    const sherpaClient = createTTSClient('sherpaonnx', sherpaOptions);
+                    this.ttsClients.set('sherpaonnx', sherpaClient);
+                    logger.info('✅ SherpaOnnx TTS client initialized');
+                } catch (sherpaError) {
+                    logger.warn('⚠️ SherpaOnnx initialization failed:', sherpaError.message);
+                }
+            }
+
+            // Initialize Windows SAPI (node-only, Windows-only)
+            if (availableEngines.includes('sapi')) {
+                try {
+                    logger.info('Initializing Windows SAPI TTS client...');
+                    const sapiClient = createTTSClient('sapi');
+                    this.ttsClients.set('sapi', sapiClient);
+                    logger.info('✅ Windows SAPI TTS client initialized');
+                } catch (sapiError) {
+                    logger.warn('⚠️ Windows SAPI initialization failed:', sapiError.message);
                 }
             }
 

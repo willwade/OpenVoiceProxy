@@ -74,6 +74,31 @@ simulate-grid3.bat
 - Voices: http://localhost:3000/v1/voices
 - User: http://localhost:3000/v1/user
 
+### ESP32 / Embedded Endpoint
+Purpose-built endpoint for low-power devices.
+
+- Speak: `POST /api/speak`
+- List voices: `GET /api/voices`
+- List engines: `GET /api/engines`
+
+Headers: `X-API-Key: <your-admin-or-user-key>`
+
+Example:
+```bash
+curl -X POST http://localhost:3000/api/speak \
+  -H "X-API-Key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Hello ESP32",
+    "engine": "azure",
+    "voice": "en-US-JennyNeural",
+    "format": "pcm16",
+    "sample_rate": 16000
+  }' \
+  --output esp32-audio.pcm
+```
+Defaults can be set with `ESP32_DEFAULT_ENGINE`, `ESP32_DEFAULT_VOICE`, `ESP32_DEFAULT_SAMPLE_RATE`, and `ESP32_MAX_TEXT_LENGTH` in your `.env`.
+
 ## Host File Redirection
 
 ### Setup (Requires Administrator)

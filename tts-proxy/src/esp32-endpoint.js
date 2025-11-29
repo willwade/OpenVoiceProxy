@@ -83,18 +83,18 @@ class ESP32Endpoint {
             const maxLength = parseInt(process.env.ESP32_MAX_TEXT_LENGTH) || 500;
             if (text.length > maxLength) {
                 return res.status(400).json({
-                    error: \`Text exceeds maximum length of \${maxLength} characters\`,
+                    error: `Text exceeds maximum length of ${maxLength} characters`,
                     code: 'TEXT_TOO_LONG'
                 });
             }
 
-            logger.info(\`ESP32 speak request: engine=\${engine}, voice=\${voice}, format=\${format}, len=\${text.length}\`);
+            logger.info(`ESP32 speak request: engine=${engine}, voice=${voice}, format=${format}, len=${text.length}`);
 
             // Get TTS client for requested engine
             const ttsClient = this.getTTSClient(engine);
             if (!ttsClient) {
                 return res.status(400).json({
-                    error: \`Engine "\${engine}" not available\`,
+                    error: `Engine "${engine}" not available`,
                     code: 'ENGINE_NOT_AVAILABLE',
                     available_engines: Array.from(this.proxyServer.ttsClients.keys())
                         .filter(k => !k.includes('-mp3'))
@@ -151,7 +151,7 @@ class ESP32Endpoint {
 
             res.send(finalAudio);
 
-            logger.info(\`ESP32 speak complete: \${finalAudio.length} bytes in \${Date.now() - startTime}ms\`);
+            logger.info(`ESP32 speak complete: ${finalAudio.length} bytes in ${Date.now() - startTime}ms`);
 
         } catch (error) {
             logger.error('ESP32 speak error:', error);
@@ -187,7 +187,7 @@ class ESP32Endpoint {
                         });
                     }
                 } catch (e) {
-                    logger.warn(\`Failed to get voices from \${eng}: \${e.message}\`);
+                    logger.warn(`Failed to get voices from ${eng}: ${e.message}`);
                 }
             }
 
