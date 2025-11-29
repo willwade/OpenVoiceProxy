@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const dotenv = require('dotenv');
 const logger = require('./logger');
 
 class EnvironmentLoader {
@@ -9,12 +10,24 @@ class EnvironmentLoader {
 
     loadEnvironment() {
         try {
-            // Try to load dotenv first
-            try {
-                require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
-                logger.info('Loaded .env.local file');
-            } catch (error) {
-                logger.warn('dotenv not available or .env.local not found, using existing environment');
+            const envCandidates = [
+                path.join(__dirname, '..', '.env.local'),
+                path.join(__dirname, '..', '.env'),
+                path.join(__dirname, '..', '..', '.env.local'),
+                path.join(__dirname, '..', '..', '.env')
+            ];
+
+            let loadedEnv = false;
+            for (const envPath of envCandidates) {
+                if (fs.existsSync(envPath)) {
+                    dotenv.config({ path: envPath });
+                    logger.info(`Loaded environment file: ${path.relative(process.cwd(), envPath)}`);
+                    loadedEnv = true;
+                }
+            }
+
+            if (!loadedEnv) {
+                logger.warn('No .env/.env.local files found, using existing environment variables');
             }
 
             // Map your existing environment variables to expected names
@@ -49,6 +62,26 @@ class EnvironmentLoader {
                 logger.info('Created Google credentials file from base64');
             } catch (error) {
                 logger.warn('Failed to create Google credentials file:', error.message);
+            }
+        }
+
+        if (process.env.GOOGLE_KEY && !process.env.GOOGLECLOUDTTS_API_KEY) {
+            process.env.GOOGLECLOUDTTS_API_KEY = process.env.GOOGLE_KEY;
+            logger.info('Mapped GOOGLE_KEY to GOOGLECLOUDTTS_API_KEY (Google REST API key)');
+        }
+
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            try {
+                const credentialsSource = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+                const json = typeof credentialsSource === 'string' && credentialsSource.trim().startsWith('{')
+                    ? credentialsSource
+                    : JSON.stringify(JSON.parse(credentialsSource));
+                const tempCredentialsPath = path.join(__dirname, '..', 'temp-google-credentials.json');
+                fs.writeFileSync(tempCredentialsPath, json);
+                process.env.GOOGLE_APPLICATION_CREDENTIALS = tempCredentialsPath;
+                logger.info('Created Google credentials file from GOOGLE_APPLICATION_CREDENTIALS_JSON');
+            } catch (error) {
+                logger.warn('Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error.message);
             }
         }
 
@@ -87,6 +120,11 @@ class EnvironmentLoader {
         if (process.env.PLAYHT_API_KEY) {
             logger.info('PlayHT API key found');
         }
+
+        if (process.env.UPLIFTAI_KEY && !process.env.UPLIFTAI_API_KEY) {
+            process.env.UPLIFTAI_API_KEY = process.env.UPLIFTAI_KEY;
+            logger.info('Mapped UPLIFTAI_KEY to UPLIFTAI_API_KEY');
+        }
     }
 
     getAvailableEngines() {
@@ -96,12 +134,12 @@ class EnvironmentLoader {
             engines.push('azure');
         }
 
-        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLECLOUDTTS_API_KEY) {
             engines.push('google');
         }
 
         if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-            engines.push('aws-polly');
+            engines.push('polly');
         }
 
         if (process.env.ELEVENLABS_API_KEY) {
@@ -112,12 +150,46 @@ class EnvironmentLoader {
             engines.push('openai');
         }
 
+        if (process.env.PLAYHT_API_KEY && process.env.PLAYHT_USER_ID) {
+            engines.push('playht');
+        }
+
+        if (process.env.WATSON_API_KEY && process.env.WATSON_REGION && process.env.WATSON_INSTANCE_ID) {
+            engines.push('watson');
+        }
+
+        if (process.env.UPLIFTAI_API_KEY) {
+            engines.push('upliftai');
+        }
+
+        if (process.env.WITAI_TOKEN) {
+            engines.push('witai');
+        }
+
+        if (process.env.SHERPAONNX_DISABLED !== 'true') {
+            try {
+                // Only advertise sherpaonnx when the native module is available
+                require.resolve('sherpa-onnx-node');
+                engines.push('sherpaonnx');
+            } catch (err) {
+                logger.info('SherpaOnnx native module not installed, skipping sherpaonnx engine');
+            }
+        }
+
+        if (process.platform === 'win32') {
+            engines.push('sapi');
+        }
+
         return engines;
     }
 
     logAvailableEngines() {
         const engines = this.getAvailableEngines();
         logger.info(`Available TTS engines: ${engines.join(', ')}`);
+        const nodeOnlyEngines = engines.filter(engine => ['espeak', 'sherpaonnx', 'sapi'].includes(engine));
+        if (nodeOnlyEngines.length) {
+            logger.info(`Node-only engines (ignoring -wasm variants): ${nodeOnlyEngines.join(', ')}`);
+        }
         return engines;
     }
 }

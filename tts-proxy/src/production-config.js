@@ -137,16 +137,24 @@ class ProductionConfig {
         }
 
         // Google Cloud Text-to-Speech
-        if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLECLOUDTTS_API_KEY) {
             try {
-                const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+                let credentials = null;
+                if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+                    credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+                } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+                    credentials = { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS };
+                } else if (process.env.GOOGLECLOUDTTS_API_KEY) {
+                    credentials = { apiKey: process.env.GOOGLECLOUDTTS_API_KEY };
+                }
+
                 engines.google = {
                     enabled: true,
                     priority: 5,
                     credentials: credentials
                 };
             } catch (error) {
-                logger.warn('Invalid GOOGLE_APPLICATION_CREDENTIALS_JSON, skipping Google TTS');
+                logger.warn('Invalid Google credentials in environment, skipping Google TTS');
             }
         }
 
