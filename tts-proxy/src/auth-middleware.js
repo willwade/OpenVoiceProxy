@@ -7,11 +7,51 @@ class AuthMiddleware {
     }
 
     /**
+     * Check if running in development/local mode
+     * Development mode skips authentication for easier local testing
+     *
+     * Auth is SKIPPED when:
+     * - NODE_ENV=development (explicit dev mode)
+     * - LOCAL_MODE=true (for Electron/embedded/local use - skips auth)
+     * - NODE_ENV is not set and API_KEY_REQUIRED is not set (implicit dev mode)
+     *
+     * Auth is REQUIRED when:
+     * - NODE_ENV=production
+     * - API_KEY_REQUIRED=true (explicit auth requirement)
+     */
+    isDevelopmentMode() {
+        // Explicit development mode
+        if (process.env.NODE_ENV === 'development') {
+            return true;
+        }
+
+        // Local mode flag (for Electron, embedded, or local web server use)
+        // This explicitly skips auth regardless of other settings
+        if (process.env.LOCAL_MODE === 'true') {
+            return true;
+        }
+
+        // Production mode always requires auth
+        if (process.env.NODE_ENV === 'production') {
+            return false;
+        }
+
+        // If API_KEY_REQUIRED is explicitly set, respect it
+        if (process.env.API_KEY_REQUIRED === 'true') {
+            return false;
+        }
+
+        // Default: if NODE_ENV is not set (undefined) and API_KEY_REQUIRED not set,
+        // treat as development mode for easier local testing
+        return true;
+    }
+
+    /**
      * Middleware to authenticate API requests
      */
     authenticate(options = {}) {
-        const { 
-            skipPaths = ['/health', '/admin/login'], 
+        const {
+            skipPaths = ['/health', '/admin/login'],
             adminOnly = false,
             rateLimit = { requests: 100, windowMs: 60000 } // 100 requests per minute
         } = options;
@@ -23,9 +63,16 @@ class AuthMiddleware {
                     return next();
                 }
 
-                // Skip if API key authentication is disabled
-                if (process.env.API_KEY_REQUIRED !== 'true') {
-                    logger.debug('API key authentication disabled');
+                // Skip authentication in development/local mode
+                if (this.isDevelopmentMode()) {
+                    logger.debug('Development mode: skipping API key authentication');
+                    // Set a mock admin key for development to allow admin operations
+                    req.apiKey = {
+                        id: 'dev-mode',
+                        name: 'Development Mode',
+                        isAdmin: true,
+                        active: true
+                    };
                     return next();
                 }
 

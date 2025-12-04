@@ -10,29 +10,38 @@ class EnvironmentLoader {
 
     loadEnvironment() {
         try {
+            // Priority order (first found wins for each variable):
+            // 1. .env.local in tts-proxy/ (local overrides)
+            // 2. .env.local in project root (local overrides)
+            // 3. .env in tts-proxy/ (defaults)
+            // 4. .env in project root (defaults)
             const envCandidates = [
-                path.join(__dirname, '..', '.env.local'),
-                path.join(__dirname, '..', '.env'),
-                path.join(__dirname, '..', '..', '.env.local'),
-                path.join(__dirname, '..', '..', '.env')
+                path.join(__dirname, '..', '..', '.env.local'),  // root .env.local (highest priority)
+                path.join(__dirname, '..', '.env.local'),        // tts-proxy/.env.local
+                path.join(__dirname, '..', '..', '.env'),        // root .env
+                path.join(__dirname, '..', '.env'),              // tts-proxy/.env
             ];
 
-            let loadedEnv = false;
-            for (const envPath of envCandidates) {
+            // Load in reverse order so higher priority files override lower priority
+            // Use override: true to allow .env.local to override .env values
+            const loadedFiles = [];
+            for (const envPath of envCandidates.reverse()) {
                 if (fs.existsSync(envPath)) {
-                    dotenv.config({ path: envPath });
-                    logger.info(`Loaded environment file: ${path.relative(process.cwd(), envPath)}`);
-                    loadedEnv = true;
+                    // Use override: true so later files (higher priority) can override
+                    dotenv.config({ path: envPath, override: true });
+                    loadedFiles.unshift(path.relative(process.cwd(), envPath));
                 }
             }
 
-            if (!loadedEnv) {
+            if (loadedFiles.length > 0) {
+                logger.info(`Loaded environment files (in priority order): ${loadedFiles.join(', ')}`);
+            } else {
                 logger.warn('No .env/.env.local files found, using existing environment variables');
             }
 
             // Map your existing environment variables to expected names
             this.mapEnvironmentVariables();
-            
+
             logger.info('Environment variables mapped successfully');
         } catch (error) {
             logger.error('Error loading environment:', error);

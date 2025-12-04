@@ -42,6 +42,14 @@ class ProxyServer {
         this.authMiddleware = new AuthMiddleware(this.keyManager);
         this.securityMiddleware = new SecurityMiddleware();
 
+        // Log development mode status
+        if (this.authMiddleware.isDevelopmentMode()) {
+            logger.info('🔧 Running in DEVELOPMENT MODE - authentication bypassed');
+            logger.info('   Set NODE_ENV=production or API_KEY_REQUIRED=true to enable auth');
+        } else {
+            logger.info('🔒 Running in PRODUCTION MODE - authentication enabled');
+        }
+
         // Initialize TTS clients
         this.ttsClients = new Map();
         this.voiceMapping = new Map();
