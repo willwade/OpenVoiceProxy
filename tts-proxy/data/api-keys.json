@@ -28,5 +28,20 @@
     "createdAt": "2025-07-25T13:36:20.243Z",
     "lastUsed": "2025-07-25T13:36:27.289Z",
     "requestCount": 1
+  },
+  {
+    "id": "8f45158d-683f-42c7-a540-3b0143d7d8a5",
+    "key": "tts_5b57d03c679337a02561af2ca159bfaf7432c98c741e7c7d69641e9b44b1b3f5",
+    "name": "test-key",
+    "isAdmin": false,
+    "active": true,
+    "rateLimit": {
+      "requests": 100,
+      "windowMs": 60000
+    },
+    "expiresAt": null,
+    "createdAt": "2025-12-04T10:17:00.314Z",
+    "lastUsed": null,
+    "requestCount": 0
   }
 ]

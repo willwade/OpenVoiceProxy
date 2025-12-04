@@ -17,10 +17,18 @@ class Database {
                 return false;
             }
 
+            // DigitalOcean managed databases use self-signed certificates
+            // Always use SSL in production but don't reject self-signed certs
+            const sslConfig = process.env.NODE_ENV === 'production'
+                ? { rejectUnauthorized: false }
+                : false;
+
             this.pool = new Pool({
                 connectionString: connectionString,
-                ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+                ssl: sslConfig
             });
+
+            logger.info('Connecting to database...');
 
             // Test the connection
             const client = await this.pool.connect();
