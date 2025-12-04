@@ -43,5 +43,50 @@
     "createdAt": "2025-12-04T10:17:00.314Z",
     "lastUsed": null,
     "requestCount": 0
+  },
+  {
+    "id": "d0988c8f-0357-4589-a631-f8f6acd13fc5",
+    "key": "tts_d7523a4a646132bbe66c234da265e8e6660d879beb898f82dd1bc841174da77c",
+    "name": "TestTets",
+    "isAdmin": false,
+    "active": true,
+    "rateLimit": {
+      "requests": 100,
+      "windowMs": 60000
+    },
+    "expiresAt": null,
+    "createdAt": "2025-12-04T20:31:50.790Z",
+    "lastUsed": null,
+    "requestCount": 0
+  },
+  {
+    "id": "65c46b6e-a8d1-499c-85fe-96da4970489d",
+    "key": "tts_4bad5f12c0c7f34b325976b1e965471447dd2765dacf335b196279df985d31b2",
+    "name": "debug-test",
+    "isAdmin": false,
+    "active": true,
+    "rateLimit": {
+      "requests": 100,
+      "windowMs": 60000
+    },
+    "expiresAt": null,
+    "createdAt": "2025-12-04T20:38:57.756Z",
+    "lastUsed": null,
+    "requestCount": 0
+  },
+  {
+    "id": "4363c9a5-6199-4135-99fe-a55342872128",
+    "key": "tts_3fd42e9631eec01368bbfb0869101e1b80d7f0058d109e9863d38cf150076894",
+    "name": "test-debug",
+    "isAdmin": false,
+    "active": true,
+    "rateLimit": {
+      "requests": 100,
+      "windowMs": 60000
+    },
+    "expiresAt": null,
+    "createdAt": "2025-12-04T21:04:27.907Z",
+    "lastUsed": null,
+    "requestCount": 0
   }
 ]

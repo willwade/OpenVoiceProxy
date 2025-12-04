@@ -36,8 +36,12 @@ export const useEnginesStore = defineStore('engines', () => {
     }
   }
 
+  // Alias for backward compatibility
+  const engines = enginesStatus
+
   return {
     enginesStatus,
+    engines,
     isLoading,
     error,
     lastChecked,

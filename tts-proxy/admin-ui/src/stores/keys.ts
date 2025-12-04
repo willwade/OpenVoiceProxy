@@ -48,10 +48,12 @@ export const useKeysStore = defineStore('keys', () => {
       })
 
       if (response.ok) {
-        const data: CreateKeyResponse = await response.json()
-        lastCreatedKey.value = data.key
+        const data = await response.json()
+        // API returns { message, key: { id, key, name, ... } }
+        const keyData: CreateKeyResponse = data.key
+        lastCreatedKey.value = keyData.key
         await fetchKeys()
-        return data
+        return keyData
       } else {
         const errData = await response.json()
         error.value = errData.error || 'Failed to create key'

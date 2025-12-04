@@ -705,6 +705,11 @@ class ProxyServer {
         this.app.get('/admin/api/usage', this.adminGetUsage.bind(this));
         this.app.get('/admin/api/engines/status', this.adminGetEnginesStatus.bind(this));
 
+        // Settings routes for system credentials
+        this.app.get('/admin/api/settings/credentials', this.adminGetCredentials.bind(this));
+        this.app.put('/admin/api/settings/credentials/:engineId', this.adminUpdateCredentials.bind(this));
+        this.app.post('/admin/api/settings/credentials/:engineId/test', this.adminTestCredentials.bind(this));
+
         // Admin SPA fallback - serve index.html for all admin routes (except /admin/api)
         this.app.get('/admin/*', (req, res) => {
             res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
@@ -1433,6 +1438,143 @@ class ProxyServer {
         } catch (error) {
             logger.error('Error getting engine status:', error);
             res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async adminGetCredentials(req, res) {
+        try {
+            // Get stored credentials from database (masked)
+            const credentials = await this.keyManager.getSystemCredentials();
+            res.json({ credentials });
+        } catch (error) {
+            logger.error('Error getting credentials:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async adminUpdateCredentials(req, res) {
+        try {
+            const { engineId } = req.params;
+            const { credentials } = req.body;
+
+            if (!credentials || typeof credentials !== 'object') {
+                return res.status(400).json({ error: 'Invalid credentials format' });
+            }
+
+            await this.keyManager.setSystemCredentials(engineId, credentials);
+
+            // Reinitialize the TTS client with new credentials
+            await this.reinitializeEngine(engineId, credentials);
+
+            res.json({ success: true, message: `Credentials updated for ${engineId}` });
+        } catch (error) {
+            logger.error('Error updating credentials:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async adminTestCredentials(req, res) {
+        try {
+            const { engineId } = req.params;
+
+            // Get the current client for this engine
+            const client = this.ttsClients.get(engineId);
+
+            if (!client) {
+                return res.json({
+                    valid: false,
+                    message: `Engine ${engineId} is not initialized`
+                });
+            }
+
+            // Test credentials
+            if (client.getCredentialStatus) {
+                const status = await client.getCredentialStatus();
+                return res.json({
+                    valid: status.valid,
+                    message: status.message || (status.valid ? 'Credentials valid' : 'Credentials invalid')
+                });
+            } else if (client.checkCredentials) {
+                const isValid = await client.checkCredentials();
+                return res.json({
+                    valid: isValid,
+                    message: isValid ? 'Credentials valid' : 'Credentials invalid or service unavailable'
+                });
+            } else {
+                return res.json({
+                    valid: true,
+                    message: 'No credential check available (assumed valid)'
+                });
+            }
+        } catch (error) {
+            logger.error('Error testing credentials:', error);
+            res.json({ valid: false, message: error.message });
+        }
+    }
+
+    async reinitializeEngine(engineId, credentials) {
+        try {
+            logger.info(`Reinitializing engine: ${engineId}`);
+
+            // Remove existing client
+            this.ttsClients.delete(engineId);
+            this.ttsClients.delete(`${engineId}-mp3`);
+            this.ttsClients.delete(`${engineId}-wav`);
+
+            // Create new client with updated credentials
+            const clientConfig = this.buildClientConfig(engineId, credentials);
+            const newClient = createTTSClient(engineId, clientConfig);
+            this.ttsClients.set(engineId, newClient);
+
+            logger.info(`✅ Engine ${engineId} reinitialized`);
+        } catch (error) {
+            logger.error(`Failed to reinitialize engine ${engineId}:`, error);
+            throw error;
+        }
+    }
+
+    buildClientConfig(engineId, credentials) {
+        switch (engineId) {
+            case 'azure':
+                return {
+                    subscriptionKey: credentials.AZURE_SPEECH_KEY || process.env.AZURE_SPEECH_KEY,
+                    region: credentials.AZURE_SPEECH_REGION || process.env.AZURE_SPEECH_REGION || 'eastus'
+                };
+            case 'elevenlabs':
+                return {
+                    apiKey: credentials.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY
+                };
+            case 'google':
+                return {
+                    keyFilename: credentials.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS,
+                    apiKey: credentials.GOOGLECLOUDTTS_API_KEY || process.env.GOOGLECLOUDTTS_API_KEY
+                };
+            case 'polly':
+                return {
+                    region: credentials.AWS_REGION || process.env.AWS_REGION || 'us-east-1',
+                    accessKeyId: credentials.AWS_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID,
+                    secretAccessKey: credentials.AWS_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY
+                };
+            case 'openai':
+                return {
+                    apiKey: credentials.OPENAI_API_KEY || process.env.OPENAI_API_KEY
+                };
+            case 'playht':
+                return {
+                    apiKey: credentials.PLAYHT_API_KEY || process.env.PLAYHT_API_KEY,
+                    userId: credentials.PLAYHT_USER_ID || process.env.PLAYHT_USER_ID
+                };
+            case 'watson':
+                return {
+                    apiKey: credentials.WATSON_API_KEY || process.env.WATSON_API_KEY,
+                    serviceUrl: credentials.WATSON_SERVICE_URL || process.env.WATSON_SERVICE_URL
+                };
+            case 'witai':
+                return {
+                    apiKey: credentials.WITAI_API_KEY || process.env.WITAI_API_KEY
+                };
+            default:
+                return {};
         }
     }
 

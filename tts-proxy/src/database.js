@@ -401,6 +401,84 @@ class Database {
         logger.info(`Cleaned up ${result.rowCount} old usage log entries`);
         return result.rowCount;
     }
+
+    /**
+     * Get system credentials (masked for display)
+     */
+    async getSystemCredentials() {
+        const result = await this.query(
+            `SELECT value FROM app_config WHERE key = 'system_credentials'`
+        );
+
+        if (result.rows.length === 0) {
+            return {};
+        }
+
+        const credentials = result.rows[0].value;
+
+        // Mask credential values for display
+        const masked = {};
+        for (const [engineId, engineCreds] of Object.entries(credentials)) {
+            masked[engineId] = {};
+            for (const [key, value] of Object.entries(engineCreds)) {
+                if (typeof value === 'string' && value.length > 0) {
+                    // Show first 4 and last 4 characters
+                    if (value.length > 12) {
+                        masked[engineId][key] = value.substring(0, 4) + '••••' + value.substring(value.length - 4);
+                    } else {
+                        masked[engineId][key] = '••••••••';
+                    }
+                } else {
+                    masked[engineId][key] = value;
+                }
+            }
+        }
+
+        return masked;
+    }
+
+    /**
+     * Set system credentials for an engine
+     */
+    async setSystemCredentials(engineId, credentials) {
+        // Get existing credentials
+        const result = await this.query(
+            `SELECT value FROM app_config WHERE key = 'system_credentials'`
+        );
+
+        let existing = {};
+        if (result.rows.length > 0) {
+            existing = result.rows[0].value;
+        }
+
+        // Update the credentials for this engine
+        existing[engineId] = credentials;
+
+        // Upsert into app_config
+        await this.query(`
+            INSERT INTO app_config (key, value, updated_at)
+            VALUES ('system_credentials', $1, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+        `, [JSON.stringify(existing)]);
+
+        logger.info(`System credentials updated for engine: ${engineId}`);
+    }
+
+    /**
+     * Get raw (unmasked) system credentials for an engine
+     */
+    async getRawSystemCredentials(engineId) {
+        const result = await this.query(
+            `SELECT value FROM app_config WHERE key = 'system_credentials'`
+        );
+
+        if (result.rows.length === 0) {
+            return null;
+        }
+
+        const credentials = result.rows[0].value;
+        return credentials[engineId] || null;
+    }
 }
 
 // Singleton instance

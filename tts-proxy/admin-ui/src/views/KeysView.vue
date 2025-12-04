@@ -11,6 +11,7 @@ const newKeyIsAdmin = ref(false)
 const showCreateForm = ref(false)
 const configModalKeyId = ref<string | null>(null)
 const configModalKeyName = ref('')
+const configModalIsAdmin = ref(false)
 
 async function handleCreateKey() {
   if (!newKeyName.value.trim()) return
@@ -29,9 +30,10 @@ async function copyToClipboard(text: string) {
   await navigator.clipboard.writeText(text)
 }
 
-function openEngineConfig(keyId: string, keyName: string) {
+function openEngineConfig(keyId: string, keyName: string, isAdmin: boolean) {
   configModalKeyId.value = keyId
   configModalKeyName.value = keyName
+  configModalIsAdmin.value = isAdmin
 }
 
 function formatDate(dateStr: string | null): string {
@@ -131,7 +133,7 @@ onMounted(() => keysStore.fetchKeys())
               <td class="px-6 py-4">
                 <div class="flex gap-2">
                   <button
-                    @click="openEngineConfig(key.id, key.name)"
+                    @click="openEngineConfig(key.id, key.name, key.isAdmin)"
                     class="px-2 py-1 text-sm border rounded hover:bg-gray-50"
                   >⚙️</button>
                   <button
@@ -155,6 +157,7 @@ onMounted(() => keysStore.fetchKeys())
       v-if="configModalKeyId"
       :key-id="configModalKeyId"
       :key-name="configModalKeyName"
+      :is-admin-key="configModalIsAdmin"
       @close="configModalKeyId = null"
     />
   </AppLayout>

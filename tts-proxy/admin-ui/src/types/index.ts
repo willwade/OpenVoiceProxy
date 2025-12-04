@@ -23,6 +23,7 @@ export interface CreateKeyResponse extends ApiKey {
 // Engine types
 export interface EngineConfig {
   enabled: boolean
+  useCustomCredentials?: boolean // true = use custom, false/undefined = use system default
   credentials?: Record<string, string>
 }
 

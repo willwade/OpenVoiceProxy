@@ -190,6 +190,262 @@
           "401": { "description": "Unauthorized" }
         }
       }
+    },
+    "/admin/api/keys": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List all API keys",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": {
+          "200": { "description": "List of API keys" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Admin access required" }
+        }
+      },
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Create a new API key",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "isAdmin": { "type": "boolean", "default": false }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "API key created" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Admin access required" }
+        }
+      }
+    },
+    "/admin/api/keys/{keyId}": {
+      "patch": {
+        "tags": ["Admin"],
+        "summary": "Update an API key",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "active": { "type": "boolean" },
+                  "isAdmin": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "API key updated" },
+          "404": { "description": "API key not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "summary": "Delete an API key",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "API key deleted" },
+          "404": { "description": "API key not found" }
+        }
+      }
+    },
+    "/admin/api/keys/{keyId}/engines": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get engine configuration for an API key",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Engine configuration" },
+          "404": { "description": "API key not found" }
+        }
+      },
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Update engine configuration for an API key",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "engineConfig": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": { "type": "boolean" },
+                        "useCustomCredentials": { "type": "boolean" },
+                        "credentials": { "type": "object" }
+                      }
+                    }
+                  },
+                  "allowedVoices": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["engineConfig"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Configuration updated" },
+          "404": { "description": "API key not found" }
+        }
+      }
+    },
+    "/admin/api/engines/status": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get status of all TTS engines",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Engine status list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "engines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "name": { "type": "string" },
+                          "status": { "type": "string", "enum": ["valid", "invalid", "unknown"] },
+                          "voiceCount": { "type": "integer" },
+                          "hasCredentials": { "type": "boolean" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/settings/credentials": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get system credentials (masked)",
+        "description": "Returns stored engine credentials with values masked for security",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Masked credentials for all engines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "credentials": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/settings/credentials/{engineId}": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Update credentials for an engine",
+        "description": "Save or update credentials for a specific TTS engine. Overrides environment variables.",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "name": "engineId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "credentials": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" },
+                    "example": { "apiKey": "your-api-key", "region": "eastus" }
+                  }
+                },
+                "required": ["credentials"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Credentials updated successfully" },
+          "400": { "description": "Invalid credentials format" }
+        }
+      }
+    },
+    "/admin/api/settings/credentials/{engineId}/test": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Test credentials for an engine",
+        "description": "Validate that the provided credentials work with the TTS engine",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          { "name": "engineId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "credentials": {
+                    "type": "object",
+                    "additionalProperties": { "type": "string" }
+                  }
+                },
+                "required": ["credentials"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Credentials are valid" },
+          "400": { "description": "Credentials are invalid" }
+        }
+      }
     }
   },
   "components": {
