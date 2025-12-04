@@ -177,6 +177,12 @@ function displayApiKeys() {
         <tr>
             <td>${escapeHtml(key.name)}</td>
             <td>
+                <span class="key-hint" title="Last 8 characters of API key">
+                    ${key.keySuffix ? `tts_••••••••...${escapeHtml(key.keySuffix)}` : '<span class="text-muted">N/A</span>'}
+                </span>
+                ${key.keySuffix ? `<button class="btn btn-sm btn-copy" onclick="copyToClipboard('...${escapeHtml(key.keySuffix)}')" title="Copy hint">📋</button>` : ''}
+            </td>
+            <td>
                 ${key.isAdmin ? '<span class="admin-badge">Admin</span>' : 'Regular'}
             </td>
             <td>
@@ -523,3 +529,21 @@ window.onclick = function(event) {
         closeEngineConfigModal();
     }
 };
+
+// Utility function to copy text to clipboard
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showKeyMessage('Copied to clipboard!', 'success');
+    } catch (err) {
+        console.error('Failed to copy:', err);
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showKeyMessage('Copied to clipboard!', 'success');
+    }
+}

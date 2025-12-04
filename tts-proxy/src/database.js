@@ -87,6 +87,23 @@ class Database {
                     logger.info('Migration complete: added engine_config and allowed_voices columns');
                 }
 
+                // Check if key_suffix column exists, add if not
+                const suffixCheck = await client.query(`
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.columns
+                        WHERE table_name = 'api_keys' AND column_name = 'key_suffix'
+                    );
+                `);
+
+                if (!suffixCheck.rows[0].exists) {
+                    logger.info('Adding key_suffix column...');
+                    await client.query(`
+                        ALTER TABLE api_keys
+                        ADD COLUMN IF NOT EXISTS key_suffix VARCHAR(8)
+                    `);
+                    logger.info('Migration complete: added key_suffix column');
+                }
+
                 // Release handled by finally block
                 return;
             }
@@ -98,6 +115,7 @@ class Database {
                 CREATE TABLE IF NOT EXISTS api_keys (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     key_hash VARCHAR(255) UNIQUE NOT NULL,
+                    key_suffix VARCHAR(8),
                     name VARCHAR(255) NOT NULL,
                     is_admin BOOLEAN DEFAULT FALSE,
                     active BOOLEAN DEFAULT TRUE,
@@ -209,11 +227,12 @@ class Database {
     // Utility methods for common operations
     async createApiKey(keyData) {
         const result = await this.query(`
-            INSERT INTO api_keys (key_hash, name, is_admin, active, rate_limit_requests, rate_limit_window_ms, expires_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO api_keys (key_hash, key_suffix, name, is_admin, active, rate_limit_requests, rate_limit_window_ms, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
         `, [
             keyData.keyHash,
+            keyData.keySuffix,
             keyData.name,
             keyData.isAdmin,
             keyData.active,
@@ -221,7 +240,7 @@ class Database {
             keyData.rateLimitWindowMs,
             keyData.expiresAt
         ]);
-        
+
         return result.rows[0];
     }
 
@@ -236,9 +255,9 @@ class Database {
 
     async listApiKeys() {
         const result = await this.query(
-            'SELECT id, name, is_admin, active, created_at, last_used, request_count, expires_at FROM api_keys ORDER BY created_at DESC'
+            'SELECT id, key_suffix, name, is_admin, active, created_at, last_used, request_count, expires_at FROM api_keys ORDER BY created_at DESC'
         );
-        
+
         return result.rows;
     }
 
