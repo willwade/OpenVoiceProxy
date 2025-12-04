@@ -1,13 +1,13 @@
 name: openvoiceproxy
 services:
 - name: openvoiceproxy-api
-  source_dir: /
+  source_dir: /tts-proxy
   github:
     repo: willwade/OpenVoiceProxy
     branch: main
     deploy_on_push: true
-  run_command: cd tts-proxy && npm run start:production
-  build_command: cd tts-proxy && npm install --production
+  run_command: npm run start:production
+  build_command: npm install --production
   environment_slug: node-js
   instance_count: 1
   instance_size_slug: basic-xxs
