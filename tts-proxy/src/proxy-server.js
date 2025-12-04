@@ -1221,7 +1221,7 @@ class ProxyServer {
     // Admin API endpoints
     async adminListKeys(req, res) {
         try {
-            const keys = this.keyManager.listKeys();
+            const keys = await this.keyManager.listKeys();
             res.json({ keys });
         } catch (error) {
             logger.error('Error listing API keys:', error);
