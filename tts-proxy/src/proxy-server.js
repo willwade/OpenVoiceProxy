@@ -1398,35 +1398,59 @@ class ProxyServer {
         try {
             const engineStatuses = {};
 
-            // Check each TTS client's credential status
+            // Check each TTS client's credential status and get voice count
             for (const [engineName, client] of this.ttsClients.entries()) {
                 // Skip variant clients like 'azure-mp3'
                 if (engineName.includes('-')) continue;
 
                 try {
+                    let status = {};
+
                     if (client.getCredentialStatus) {
-                        const status = await client.getCredentialStatus();
-                        engineStatuses[engineName] = status;
+                        status = await client.getCredentialStatus();
                     } else if (client.checkCredentials) {
                         const isValid = await client.checkCredentials();
-                        engineStatuses[engineName] = {
+                        status = {
                             valid: isValid,
                             engine: engineName,
                             message: isValid ? 'Credentials valid' : 'Credentials invalid or service unavailable'
                         };
                     } else {
-                        engineStatuses[engineName] = {
+                        status = {
                             valid: true,
                             engine: engineName,
                             message: 'No credential check available (assumed valid)'
                         };
                     }
+
+                    // Fetch voice count
+                    let voiceCount = 0;
+                    try {
+                        if (client.getVoices) {
+                            const voices = await client.getVoices();
+                            voiceCount = Array.isArray(voices) ? voices.length : 0;
+                        }
+                    } catch (voiceErr) {
+                        logger.warn(`Failed to get voices for ${engineName}: ${voiceErr.message}`);
+                    }
+
+                    engineStatuses[engineName] = {
+                        ...status,
+                        details: {
+                            voiceCount,
+                            hasCredentials: status.valid !== false
+                        }
+                    };
                 } catch (error) {
                     engineStatuses[engineName] = {
                         valid: false,
                         engine: engineName,
                         message: 'Error checking credentials',
-                        error: error.message
+                        error: error.message,
+                        details: {
+                            voiceCount: 0,
+                            hasCredentials: false
+                        }
                     };
                 }
             }
