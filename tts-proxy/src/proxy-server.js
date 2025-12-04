@@ -708,6 +708,7 @@ class ProxyServer {
         this.app.get('/admin/api/keys/:keyId/engines', this.adminGetEngineConfig.bind(this));
         this.app.put('/admin/api/keys/:keyId/engines', this.adminUpdateEngineConfig.bind(this));
         this.app.get('/admin/api/usage', this.adminGetUsage.bind(this));
+        this.app.get('/admin/api/engines/status', this.adminGetEnginesStatus.bind(this));
 
         // Catch-all for unhandled routes
         this.app.use('*', (req, res) => {
@@ -1385,6 +1386,53 @@ class ProxyServer {
                 logger.error('Error updating engine config:', error);
                 res.status(500).json({ error: 'Internal server error' });
             }
+        }
+    }
+
+    async adminGetEnginesStatus(req, res) {
+        try {
+            const engineStatuses = {};
+
+            // Check each TTS client's credential status
+            for (const [engineName, client] of this.ttsClients.entries()) {
+                // Skip variant clients like 'azure-mp3'
+                if (engineName.includes('-')) continue;
+
+                try {
+                    if (client.getCredentialStatus) {
+                        const status = await client.getCredentialStatus();
+                        engineStatuses[engineName] = status;
+                    } else if (client.checkCredentials) {
+                        const isValid = await client.checkCredentials();
+                        engineStatuses[engineName] = {
+                            valid: isValid,
+                            engine: engineName,
+                            message: isValid ? 'Credentials valid' : 'Credentials invalid or service unavailable'
+                        };
+                    } else {
+                        engineStatuses[engineName] = {
+                            valid: true,
+                            engine: engineName,
+                            message: 'No credential check available (assumed valid)'
+                        };
+                    }
+                } catch (error) {
+                    engineStatuses[engineName] = {
+                        valid: false,
+                        engine: engineName,
+                        message: 'Error checking credentials',
+                        error: error.message
+                    };
+                }
+            }
+
+            res.json({
+                engines: engineStatuses,
+                timestamp: new Date().toISOString()
+            });
+        } catch (error) {
+            logger.error('Error getting engine status:', error);
+            res.status(500).json({ error: 'Internal server error' });
         }
     }
 
