@@ -64,11 +64,13 @@ class DatabaseKeyManager {
         } = options;
 
         const apiKey = this.generateApiKey();
-        
+        const keySuffix = apiKey.slice(-8); // Store last 8 characters for identification
+
         if (this.useDatabase) {
             try {
                 const keyData = await database.createApiKey({
                     keyHash: this.hashApiKey(apiKey),
+                    keySuffix,
                     name,
                     isAdmin,
                     active,
@@ -174,6 +176,7 @@ class DatabaseKeyManager {
                 const keys = await database.listApiKeys();
                 return keys.map(key => ({
                     id: key.id,
+                    keySuffix: key.key_suffix,
                     name: key.name,
                     isAdmin: key.is_admin,
                     active: key.active,
