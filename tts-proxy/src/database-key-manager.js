@@ -276,6 +276,12 @@ class DatabaseKeyManager {
     async logRequest(keyId, method, path, responseTime = null, ipAddress = null, userAgent = null) {
         await this.initialize();
 
+        // Skip logging for the environment admin key (not a valid UUID)
+        if (keyId === 'env-admin') {
+            logger.debug('Skipping usage logging for environment admin key');
+            return;
+        }
+
         if (this.useDatabase) {
             try {
                 await database.logUsage(keyId, method, path, responseTime, ipAddress, userAgent);

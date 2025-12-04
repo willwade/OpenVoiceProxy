@@ -56,8 +56,22 @@ class Database {
 
     async initializeSchema() {
         const client = await this.pool.connect();
-        
+
         try {
+            // Check if tables already exist (avoid permission errors if they do)
+            const tableCheck = await client.query(`
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'api_keys'
+                );
+            `);
+
+            if (tableCheck.rows[0].exists) {
+                logger.info('Database tables already exist');
+                client.release();
+                return;
+            }
+
             await client.query('BEGIN');
 
             // Create api_keys table
