@@ -1,17 +1,51 @@
 // Admin Panel JavaScript
 let adminApiKey = '';
 let apiKeys = [];
+let isDevelopmentMode = false;
+
+// Check if server is in development mode (allows bypassing auth)
+async function checkDevelopmentMode() {
+    try {
+        // Try to access admin API without credentials - if it works, we're in dev mode
+        const response = await fetch('/admin/api/keys');
+        if (response.ok) {
+            isDevelopmentMode = true;
+            console.log('🔧 Development mode detected - authentication bypassed');
+            return true;
+        }
+    } catch (error) {
+        console.log('Production mode - authentication required');
+    }
+    return false;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    const devMode = await checkDevelopmentMode();
+    if (devMode) {
+        // Auto-authenticate in development mode
+        document.getElementById('authSection').innerHTML = `
+            <div class="alert alert-success">
+                <strong>🔧 Development Mode</strong><br>
+                Authentication is bypassed in local development.
+                <small>Set <code>NODE_ENV=production</code> or <code>API_KEY_REQUIRED=true</code> to enable auth.</small>
+            </div>
+        `;
+        document.getElementById('mainContent').style.display = 'block';
+        await loadDashboard();
+    }
+});
 
 // Authentication
 async function authenticate() {
     const keyInput = document.getElementById('adminApiKey');
     adminApiKey = keyInput.value.trim();
-    
+
     if (!adminApiKey) {
         showAuthError('Please enter an admin API key');
         return;
     }
-    
+
     try {
         // Test the admin API key by trying to list keys
         const response = await fetch('/admin/api/keys', {
@@ -19,7 +53,7 @@ async function authenticate() {
                 'X-API-Key': adminApiKey
             }
         });
-        
+
         if (response.ok) {
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('mainContent').style.display = 'block';
@@ -34,8 +68,22 @@ async function authenticate() {
 
 function showAuthError(message) {
     const errorDiv = document.getElementById('authError');
-    errorDiv.textContent = message;
-    errorDiv.classList.remove('hidden');
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+    }
+}
+
+// Helper to get fetch headers (only include API key if set)
+function getHeaders(includeContentType = false) {
+    const headers = {};
+    if (adminApiKey) {
+        headers['X-API-Key'] = adminApiKey;
+    }
+    if (includeContentType) {
+        headers['Content-Type'] = 'application/json';
+    }
+    return headers;
 }
 
 // Dashboard loading
@@ -50,11 +98,9 @@ async function loadDashboard() {
 async function loadUsageStats() {
     try {
         const response = await fetch('/admin/api/usage', {
-            headers: {
-                'X-API-Key': adminApiKey
-            }
+            headers: getHeaders()
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             displayUsageStats(data.usage);
@@ -95,11 +141,9 @@ function displayUsageStats(stats) {
 async function loadApiKeys() {
     try {
         const response = await fetch('/admin/api/keys', {
-            headers: {
-                'X-API-Key': adminApiKey
-            }
+            headers: getHeaders()
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             apiKeys = data.keys;
@@ -142,29 +186,26 @@ function displayApiKeys() {
 async function createApiKey() {
     const name = document.getElementById('keyName').value.trim();
     const isAdmin = document.getElementById('isAdmin').checked;
-    
+
     if (!name) {
         showKeyMessage('Please enter a name for the API key', 'error');
         return;
     }
-    
+
     try {
         const response = await fetch('/admin/api/keys', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': adminApiKey
-            },
+            headers: getHeaders(true),
             body: JSON.stringify({
                 name,
                 isAdmin
             })
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             showKeyMessage(`API key created successfully!`, 'success');
-            
+
             // Show the new API key
             const keyDisplay = document.createElement('div');
             keyDisplay.className = 'key-display';
@@ -173,11 +214,11 @@ async function createApiKey() {
                 <code>${data.key.key}</code>
             `;
             document.getElementById('keyMessage').appendChild(keyDisplay);
-            
+
             // Clear form
             document.getElementById('keyName').value = '';
             document.getElementById('isAdmin').checked = false;
-            
+
             // Reload keys
             await loadApiKeys();
             await loadUsageStats();
@@ -194,15 +235,12 @@ async function toggleKeyStatus(keyId, newStatus) {
     try {
         const response = await fetch(`/admin/api/keys/${keyId}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': adminApiKey
-            },
+            headers: getHeaders(true),
             body: JSON.stringify({
                 active: newStatus
             })
         });
-        
+
         if (response.ok) {
             showKeyMessage(`API key ${newStatus ? 'enabled' : 'disabled'} successfully`, 'success');
             await loadApiKeys();
@@ -219,13 +257,11 @@ async function deleteApiKey(keyId) {
     if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
         return;
     }
-    
+
     try {
         const response = await fetch(`/admin/api/keys/${keyId}`, {
             method: 'DELETE',
-            headers: {
-                'X-API-Key': adminApiKey
-            }
+            headers: getHeaders()
         });
         
         if (response.ok) {
