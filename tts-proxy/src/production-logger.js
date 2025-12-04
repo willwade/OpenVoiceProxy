@@ -41,8 +41,14 @@ class ProductionLogger {
 
         const transports = [];
 
-        // Console transport (always enabled for development, optional for production)
-        if (!isProduction || process.env.LOG_TO_CONSOLE === 'true') {
+        // Console transport - ALWAYS enabled in production for cloud log aggregation
+        // In production, use JSON format for structured logging
+        // In development, use colorized simple format
+        if (isProduction) {
+            transports.push(new winston.transports.Console({
+                format: customFormat  // JSON format for cloud log aggregation
+            }));
+        } else {
             transports.push(new winston.transports.Console({
                 format: winston.format.combine(
                     winston.format.colorize(),
@@ -52,7 +58,7 @@ class ProductionLogger {
         }
 
         // File transports (only in development or when LOG_TO_FILE is enabled)
-        if (!isProduction || process.env.LOG_TO_FILE === 'true') {
+        if (!isProduction && process.env.LOG_TO_FILE !== 'false') {
             const logDir = process.env.LOG_DIR || './logs';
             
             // Ensure log directory exists
