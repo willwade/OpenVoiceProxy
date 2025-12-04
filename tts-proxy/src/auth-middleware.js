@@ -127,6 +127,12 @@ class AuthMiddleware {
             return authHeader.substring(7);
         }
 
+        // Check xi-api-key header (ElevenLabs format)
+        const xiApiKeyHeader = req.headers['xi-api-key'];
+        if (xiApiKeyHeader) {
+            return xiApiKeyHeader;
+        }
+
         // Check X-API-Key header
         const apiKeyHeader = req.headers['x-api-key'];
         if (apiKeyHeader) {
