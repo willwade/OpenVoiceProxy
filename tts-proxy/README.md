@@ -99,6 +99,68 @@ curl -X POST http://localhost:3000/api/speak \
 ```
 Defaults can be set with `ESP32_DEFAULT_ENGINE`, `ESP32_DEFAULT_VOICE`, `ESP32_DEFAULT_SAMPLE_RATE`, and `ESP32_MAX_TEXT_LENGTH` in your `.env`.
 
+## Admin API
+
+Manage API keys and monitor TTS engines. All admin endpoints require an admin API key via `X-API-Key` header.
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/admin/api/keys` | List all API keys |
+| `POST` | `/admin/api/keys` | Create a new API key |
+| `PUT` | `/admin/api/keys/:keyId` | Update an API key |
+| `DELETE` | `/admin/api/keys/:keyId` | Delete an API key |
+| `GET` | `/admin/api/keys/:keyId/engines` | Get engine config for a key |
+| `PUT` | `/admin/api/keys/:keyId/engines` | Update engine config for a key |
+| `GET` | `/admin/api/usage` | Get usage statistics |
+| `GET` | `/admin/api/engines/status` | Check TTS engine credentials |
+
+### Check Engine Credentials
+
+```bash
+curl -s https://your-server/admin/api/engines/status \
+  -H "X-API-Key: YOUR_ADMIN_KEY" | jq .
+```
+
+Response:
+```json
+{
+  "engines": {
+    "espeak": { "valid": true, "message": "Credentials valid" },
+    "azure": { "valid": true, "voiceCount": 550 },
+    "elevenlabs": { "valid": false, "message": "Credentials invalid" }
+  },
+  "timestamp": "2025-12-04T19:43:15.873Z"
+}
+```
+
+### Create API Key
+
+```bash
+curl -X POST https://your-server/admin/api/keys \
+  -H "X-API-Key: YOUR_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My App Key", "isAdmin": false}'
+```
+
+### Configure Engine Access Per Key
+
+```bash
+curl -X PUT https://your-server/admin/api/keys/KEY_ID/engines \
+  -H "X-API-Key: YOUR_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"engineConfig": {"azure": {"enabled": true}, "elevenlabs": {"enabled": false}}}'
+```
+
+### Admin UI
+
+Access the admin dashboard at `/admin/admin.html` to:
+- View and manage API keys
+- Monitor usage statistics
+- Configure engine access per key
+- Check TTS engine credentials
+
 ## Host File Redirection
 
 ### Setup (Requires Administrator)
