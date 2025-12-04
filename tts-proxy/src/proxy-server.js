@@ -608,8 +608,8 @@ class ProxyServer {
             limit: process.env.MAX_REQUEST_SIZE || '10mb'
         }));
 
-        // Serve static files for admin interface
-        this.app.use('/admin', express.static(path.join(__dirname, '..', 'public')));
+        // Serve static files for admin interface (Vue SPA)
+        this.app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin')));
 
         // Authentication middleware for API routes
         this.app.use('/v1', this.authMiddleware.authenticate());
@@ -687,11 +687,6 @@ class ProxyServer {
             }
         });
 
-        // Admin interface redirect
-        this.app.get('/admin', (req, res) => {
-            res.redirect('/admin/admin.html');
-        });
-
         // ElevenLabs API v1 routes
         this.app.get('/v1/voices', this.getVoices.bind(this));
         this.app.post('/v1/text-to-speech/:voiceId/stream/with-timestamps', this.textToSpeech.bind(this));
@@ -709,6 +704,11 @@ class ProxyServer {
         this.app.put('/admin/api/keys/:keyId/engines', this.adminUpdateEngineConfig.bind(this));
         this.app.get('/admin/api/usage', this.adminGetUsage.bind(this));
         this.app.get('/admin/api/engines/status', this.adminGetEnginesStatus.bind(this));
+
+        // Admin SPA fallback - serve index.html for all admin routes (except /admin/api)
+        this.app.get('/admin/*', (req, res) => {
+            res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
+        });
 
         // Catch-all for unhandled routes
         this.app.use('*', (req, res) => {
