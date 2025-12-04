@@ -11,24 +11,23 @@ class Database {
         try {
             // Use DATABASE_URL from environment (DigitalOcean provides this)
             const connectionString = process.env.DATABASE_URL;
-            
+
             if (!connectionString) {
                 logger.warn('No DATABASE_URL provided, using file-based storage');
                 return false;
             }
 
             // DigitalOcean managed databases use self-signed certificates
-            // Always use SSL in production but don't reject self-signed certs
-            const sslConfig = process.env.NODE_ENV === 'production'
-                ? { rejectUnauthorized: false }
-                : false;
-
+            // We must accept self-signed certs in production
+            // The ssl option with rejectUnauthorized: false is required
             this.pool = new Pool({
                 connectionString: connectionString,
-                ssl: sslConfig
+                ssl: {
+                    rejectUnauthorized: false
+                }
             });
 
-            logger.info('Connecting to database...');
+            logger.info('Connecting to database with SSL (rejectUnauthorized: false)...');
 
             // Test the connection
             const client = await this.pool.connect();
