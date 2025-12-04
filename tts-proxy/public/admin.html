@@ -210,10 +210,187 @@
         .key-display {
             font-family: monospace;
             background: #f8f9fa;
-            padding: 8px;
+            padding: 15px;
             border-radius: 4px;
             word-break: break-all;
             margin-top: 10px;
+            border: 2px solid #27ae60;
+        }
+
+        .key-display-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .key-display-header .warning-icon {
+            font-size: 20px;
+        }
+
+        .key-value-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .key-value-container code {
+            flex: 1;
+            font-size: 14px;
+            user-select: all;
+        }
+
+        .btn-copy {
+            background: #9b59b6;
+            padding: 8px 16px;
+            white-space: nowrap;
+        }
+
+        .btn-copy:hover {
+            background: #8e44ad;
+        }
+
+        .btn-copy.copied {
+            background: #27ae60;
+        }
+
+        .btn-configure {
+            background: #9b59b6;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-configure:hover {
+            background: #8e44ad;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 50px auto;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 800px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #2c3e50;
+        }
+
+        .modal-close {
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .engine-config-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .engine-config-item {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+
+        .engine-config-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .engine-config-header label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .engine-config-details {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .engine-config-item.enabled .engine-config-details {
+            display: block;
+        }
+
+        .engine-badge {
+            background: #3498db;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+
+        .engine-badge.free {
+            background: #27ae60;
+        }
+
+        .engine-badge.paid {
+            background: #e74c3c;
+        }
+
+        .voices-select {
+            width: 100%;
+            min-height: 100px;
+        }
+
+        .config-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .config-row .form-group {
+            margin-bottom: 0;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
         }
     </style>
 </head>
@@ -286,6 +463,27 @@
                         <!-- Keys will be populated here -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Engine Configuration Modal -->
+    <div id="engineConfigModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Configure Engines for: <span id="configKeyName"></span></h2>
+                <span class="modal-close" onclick="closeEngineConfigModal()">&times;</span>
+            </div>
+            <p style="margin-bottom: 20px; color: #666;">
+                Enable/disable TTS engines for this API key. You can also provide custom API credentials
+                that will be used instead of the system defaults.
+            </p>
+            <div id="engineConfigList" class="engine-config-list">
+                <!-- Engine configs will be populated here -->
+            </div>
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                <button class="btn btn-success" onclick="saveEngineConfig()">Save Configuration</button>
+                <button class="btn" onclick="closeEngineConfigModal()">Cancel</button>
             </div>
         </div>
     </div>

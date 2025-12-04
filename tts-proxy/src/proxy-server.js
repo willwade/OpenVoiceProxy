@@ -705,6 +705,8 @@ class ProxyServer {
         this.app.post('/admin/api/keys', this.adminCreateKey.bind(this));
         this.app.put('/admin/api/keys/:keyId', this.adminUpdateKey.bind(this));
         this.app.delete('/admin/api/keys/:keyId', this.adminDeleteKey.bind(this));
+        this.app.get('/admin/api/keys/:keyId/engines', this.adminGetEngineConfig.bind(this));
+        this.app.put('/admin/api/keys/:keyId/engines', this.adminUpdateEngineConfig.bind(this));
         this.app.get('/admin/api/usage', this.adminGetUsage.bind(this));
 
         // Catch-all for unhandled routes
@@ -882,6 +884,43 @@ class ProxyServer {
                 logger.warn(`Voice ${voiceId} not found in mapping`);
                 res.status(404).json({ error: 'Voice not found' });
                 return;
+            }
+
+            // Check if the key has engine restrictions
+            const keyInfo = req.apiKey;
+            if (keyInfo && keyInfo.id && keyInfo.id !== 'dev-mode' && keyInfo.id !== 'env-admin') {
+                try {
+                    const keyDetails = await this.keyManager.getKeyDetails(keyInfo.id);
+                    if (keyDetails && keyDetails.engineConfig) {
+                        const engineConfig = keyDetails.engineConfig[voiceMapping.engine];
+                        if (engineConfig && engineConfig.enabled === false) {
+                            logger.warn(`Engine ${voiceMapping.engine} is disabled for key ${keyInfo.name}`);
+                            res.status(403).json({
+                                error: `Engine '${voiceMapping.engine}' is not enabled for this API key`
+                            });
+                            return;
+                        }
+
+                        // Check voice restrictions
+                        if (keyDetails.allowedVoices && keyDetails.allowedVoices.length > 0) {
+                            if (!keyDetails.allowedVoices.includes(voiceId) &&
+                                !keyDetails.allowedVoices.some(v => voiceId.startsWith(v.replace('*', '')))) {
+                                logger.warn(`Voice ${voiceId} is not allowed for key ${keyInfo.name}`);
+                                res.status(403).json({
+                                    error: `Voice '${voiceId}' is not allowed for this API key`
+                                });
+                                return;
+                            }
+                        }
+
+                        // Store custom credentials for later use (if any)
+                        if (engineConfig && engineConfig.credentials) {
+                            req.customCredentials = engineConfig.credentials;
+                        }
+                    }
+                } catch (error) {
+                    logger.debug('Could not get key details for engine check:', error.message);
+                }
             }
 
             // Get the appropriate TTS client based on request type
@@ -1305,6 +1344,47 @@ class ProxyServer {
         } catch (error) {
             logger.error('Error getting usage stats:', error);
             res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async adminGetEngineConfig(req, res) {
+        try {
+            const { keyId } = req.params;
+            const config = await this.keyManager.getEngineConfig(keyId);
+            res.json(config);
+        } catch (error) {
+            if (error.message === 'API key not found') {
+                res.status(404).json({ error: 'API key not found' });
+            } else {
+                logger.error('Error getting engine config:', error);
+                res.status(500).json({ error: 'Internal server error' });
+            }
+        }
+    }
+
+    async adminUpdateEngineConfig(req, res) {
+        try {
+            const { keyId } = req.params;
+            const { engineConfig, allowedVoices } = req.body;
+
+            if (!engineConfig) {
+                return res.status(400).json({ error: 'engineConfig is required' });
+            }
+
+            const result = await this.keyManager.updateEngineConfig(keyId, engineConfig, allowedVoices);
+            res.json({
+                message: 'Engine configuration updated successfully',
+                ...result
+            });
+        } catch (error) {
+            if (error.message === 'API key not found') {
+                res.status(404).json({ error: 'API key not found' });
+            } else if (error.message === 'Engine configuration requires database storage') {
+                res.status(400).json({ error: 'Engine configuration requires database storage' });
+            } else {
+                logger.error('Error updating engine config:', error);
+                res.status(500).json({ error: 'Internal server error' });
+            }
         }
     }
 

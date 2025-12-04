@@ -2,6 +2,22 @@
 let adminApiKey = '';
 let apiKeys = [];
 let isDevelopmentMode = false;
+let currentConfigKeyId = null;
+let availableEngines = [];
+
+// Engine definitions with their configuration requirements
+const ENGINE_DEFINITIONS = {
+    espeak: { name: 'eSpeak', type: 'free', requiresKey: false, description: 'Free, open-source speech synthesizer' },
+    azure: { name: 'Azure TTS', type: 'paid', requiresKey: true, keyFields: ['AZURE_SPEECH_KEY', 'AZURE_SPEECH_REGION'], description: 'Microsoft Azure Cognitive Services' },
+    elevenlabs: { name: 'ElevenLabs', type: 'paid', requiresKey: true, keyFields: ['ELEVENLABS_API_KEY'], description: 'High-quality AI voices' },
+    openai: { name: 'OpenAI TTS', type: 'paid', requiresKey: true, keyFields: ['OPENAI_API_KEY'], description: 'OpenAI text-to-speech' },
+    google: { name: 'Google Cloud TTS', type: 'paid', requiresKey: true, keyFields: ['GOOGLE_API_KEY'], description: 'Google Cloud Text-to-Speech' },
+    polly: { name: 'AWS Polly', type: 'paid', requiresKey: true, keyFields: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION'], description: 'Amazon Polly TTS' },
+    watson: { name: 'IBM Watson', type: 'paid', requiresKey: true, keyFields: ['WATSON_API_KEY', 'WATSON_SERVICE_URL'], description: 'IBM Watson Text to Speech' },
+    playht: { name: 'PlayHT', type: 'paid', requiresKey: true, keyFields: ['PLAYHT_API_KEY', 'PLAYHT_USER_ID'], description: 'PlayHT voice generation' },
+    witai: { name: 'Wit.ai', type: 'free', requiresKey: true, keyFields: ['WITAI_API_KEY'], description: 'Facebook Wit.ai TTS' },
+    sherpaonnx: { name: 'SherpaOnnx', type: 'free', requiresKey: false, description: 'Local neural TTS (Kokoro voices)' }
+};
 
 // Check if server is in development mode (allows bypassing auth)
 async function checkDevelopmentMode() {
@@ -156,7 +172,7 @@ async function loadApiKeys() {
 
 function displayApiKeys() {
     const tbody = document.getElementById('keysTableBody');
-    
+
     tbody.innerHTML = apiKeys.map(key => `
         <tr>
             <td>${escapeHtml(key.name)}</td>
@@ -172,6 +188,9 @@ function displayApiKeys() {
             <td>${key.lastUsed ? formatDate(key.lastUsed) : 'Never'}</td>
             <td>${key.requestCount || 0}</td>
             <td>
+                <button class="btn btn-configure" onclick="openEngineConfigModal('${key.id}', '${escapeHtml(key.name)}')">
+                    ⚙️ Configure
+                </button>
                 <button class="btn" onclick="toggleKeyStatus('${key.id}', ${!key.active})">
                     ${key.active ? 'Disable' : 'Enable'}
                 </button>
@@ -204,16 +223,29 @@ async function createApiKey() {
 
         if (response.ok) {
             const data = await response.json();
-            showKeyMessage(`API key created successfully!`, 'success');
 
-            // Show the new API key
-            const keyDisplay = document.createElement('div');
-            keyDisplay.className = 'key-display';
-            keyDisplay.innerHTML = `
-                <strong>New API Key (save this, it won't be shown again):</strong><br>
-                <code>${data.key.key}</code>
+            // Show success message with copy button
+            const messageDiv = document.getElementById('keyMessage');
+            messageDiv.className = 'alert alert-success';
+            messageDiv.innerHTML = `
+                <div class="key-display">
+                    <div class="key-display-header">
+                        <span class="warning-icon">⚠️</span>
+                        <strong>API Key Created - Save this now! It won't be shown again.</strong>
+                    </div>
+                    <div class="key-value-container">
+                        <code id="newKeyValue">${data.key.key}</code>
+                        <button class="btn btn-copy" onclick="copyApiKey('${data.key.key}', this)">
+                            📋 Copy
+                        </button>
+                    </div>
+                    <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                        Key name: <strong>${escapeHtml(data.key.name)}</strong> |
+                        Type: ${data.key.isAdmin ? 'Admin' : 'Regular'}
+                    </p>
+                </div>
             `;
-            document.getElementById('keyMessage').appendChild(keyDisplay);
+            messageDiv.classList.remove('hidden');
 
             // Clear form
             document.getElementById('keyName').value = '';
@@ -228,6 +260,34 @@ async function createApiKey() {
         }
     } catch (error) {
         showKeyMessage('Error creating API key. Please try again.', 'error');
+    }
+}
+
+// Copy API key to clipboard
+async function copyApiKey(key, button) {
+    try {
+        await navigator.clipboard.writeText(key);
+        const originalText = button.innerHTML;
+        button.innerHTML = '✅ Copied!';
+        button.classList.add('copied');
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.classList.remove('copied');
+        }, 2000);
+    } catch (err) {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = key;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        button.innerHTML = '✅ Copied!';
+        button.classList.add('copied');
+        setTimeout(() => {
+            button.innerHTML = '📋 Copy';
+            button.classList.remove('copied');
+        }, 2000);
     }
 }
 
@@ -306,3 +366,160 @@ setInterval(async () => {
         await loadUsageStats();
     }
 }, 30000);
+
+// Engine Configuration Modal Functions
+async function openEngineConfigModal(keyId, keyName) {
+    currentConfigKeyId = keyId;
+    document.getElementById('configKeyName').textContent = keyName;
+
+    // Load current engine config for this key
+    try {
+        const response = await fetch(`/admin/api/keys/${keyId}/engines`, {
+            headers: getHeaders()
+        });
+
+        let currentConfig = {};
+        if (response.ok) {
+            const data = await response.json();
+            currentConfig = data.engineConfig || {};
+        }
+
+        renderEngineConfigList(currentConfig);
+        document.getElementById('engineConfigModal').style.display = 'block';
+    } catch (error) {
+        console.error('Error loading engine config:', error);
+        showKeyMessage('Error loading engine configuration', 'error');
+    }
+}
+
+function closeEngineConfigModal() {
+    document.getElementById('engineConfigModal').style.display = 'none';
+    currentConfigKeyId = null;
+}
+
+function renderEngineConfigList(currentConfig) {
+    const container = document.getElementById('engineConfigList');
+
+    container.innerHTML = Object.entries(ENGINE_DEFINITIONS).map(([engineId, engine]) => {
+        const config = currentConfig[engineId] || {};
+        const isEnabled = config.enabled !== false; // Default to enabled if not set
+        const hasCustomKey = config.apiKey || config.credentials;
+
+        return `
+            <div class="engine-config-item ${isEnabled ? 'enabled' : ''}" id="engine-${engineId}">
+                <div class="engine-config-header">
+                    <label>
+                        <input type="checkbox"
+                               id="enable-${engineId}"
+                               ${isEnabled ? 'checked' : ''}
+                               onchange="toggleEngineConfig('${engineId}')">
+                        ${engine.name}
+                    </label>
+                    <span class="engine-badge ${engine.type}">${engine.type}</span>
+                    ${hasCustomKey ? '<span class="engine-badge" style="background:#27ae60;">Custom Key</span>' : ''}
+                </div>
+                <p style="font-size: 12px; color: #666; margin: 5px 0;">${engine.description}</p>
+
+                <div class="engine-config-details">
+                    ${engine.requiresKey ? renderKeyFields(engineId, engine, config) : `
+                        <p style="color: #27ae60; font-size: 13px;">
+                            ✓ This engine doesn't require API credentials
+                        </p>
+                    `}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderKeyFields(engineId, engine, config) {
+    const credentials = config.credentials || {};
+
+    return `
+        <p style="font-size: 13px; margin-bottom: 10px;">
+            <strong>Custom API Credentials</strong> (leave blank to use system defaults)
+        </p>
+        <div class="config-row">
+            ${engine.keyFields.map(field => `
+                <div class="form-group">
+                    <label for="${engineId}-${field}">${field}</label>
+                    <input type="password"
+                           id="${engineId}-${field}"
+                           placeholder="Enter ${field}"
+                           value="${credentials[field] || ''}"
+                           autocomplete="off">
+                    <p class="help-text">Leave blank to use system default</p>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function toggleEngineConfig(engineId) {
+    const checkbox = document.getElementById(`enable-${engineId}`);
+    const container = document.getElementById(`engine-${engineId}`);
+
+    if (checkbox.checked) {
+        container.classList.add('enabled');
+    } else {
+        container.classList.remove('enabled');
+    }
+}
+
+async function saveEngineConfig() {
+    if (!currentConfigKeyId) return;
+
+    const engineConfig = {};
+
+    Object.entries(ENGINE_DEFINITIONS).forEach(([engineId, engine]) => {
+        const enabled = document.getElementById(`enable-${engineId}`).checked;
+        const config = { enabled };
+
+        if (engine.requiresKey && enabled) {
+            const credentials = {};
+            let hasCredentials = false;
+
+            engine.keyFields.forEach(field => {
+                const input = document.getElementById(`${engineId}-${field}`);
+                if (input && input.value.trim()) {
+                    credentials[field] = input.value.trim();
+                    hasCredentials = true;
+                }
+            });
+
+            if (hasCredentials) {
+                config.credentials = credentials;
+            }
+        }
+
+        engineConfig[engineId] = config;
+    });
+
+    try {
+        const response = await fetch(`/admin/api/keys/${currentConfigKeyId}/engines`, {
+            method: 'PUT',
+            headers: getHeaders(true),
+            body: JSON.stringify({ engineConfig })
+        });
+
+        if (response.ok) {
+            showKeyMessage('Engine configuration saved successfully', 'success');
+            closeEngineConfigModal();
+            await loadApiKeys();
+        } else {
+            const error = await response.json();
+            showKeyMessage(`Error saving configuration: ${error.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error saving engine config:', error);
+        showKeyMessage('Error saving engine configuration', 'error');
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('engineConfigModal');
+    if (event.target === modal) {
+        closeEngineConfigModal();
+    }
+};
