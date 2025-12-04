@@ -10,7 +10,7 @@ services:
   build_command: npm install --production
   environment_slug: node-js
   instance_count: 1
-  instance_size_slug: basic-xxs
+  instance_size_slug: basic-xs
   http_port: 3000
   health_check:
     http_path: /health
@@ -27,6 +27,8 @@ services:
   - key: LOG_LEVEL
     value: info
   - key: API_KEY_REQUIRED
+    value: "true"
+  - key: SHERPAONNX_DISABLED
     value: "true"
   - key: ADMIN_API_KEY
     scope: RUN_TIME
