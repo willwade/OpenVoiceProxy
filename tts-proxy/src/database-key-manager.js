@@ -254,7 +254,7 @@ class DatabaseKeyManager {
         if (this.useDatabase) {
             try {
                 const deletedKey = await database.deleteApiKey(keyId);
-                
+
                 if (!deletedKey) {
                     throw new Error('API key not found');
                 }
@@ -267,6 +267,85 @@ class DatabaseKeyManager {
             }
         } else {
             return await this.fileKeyManager.deleteKey(keyId);
+        }
+    }
+
+    /**
+     * Get engine configuration for an API key
+     */
+    async getEngineConfig(keyId) {
+        await this.initialize();
+
+        if (this.useDatabase) {
+            try {
+                const config = await database.getEngineConfig(keyId);
+                if (!config) {
+                    throw new Error('API key not found');
+                }
+                return config;
+            } catch (error) {
+                logger.error('Error getting engine config:', error);
+                throw error;
+            }
+        } else {
+            // File-based storage doesn't support engine config
+            return { engineConfig: {}, allowedVoices: null };
+        }
+    }
+
+    /**
+     * Update engine configuration for an API key
+     */
+    async updateEngineConfig(keyId, engineConfig, allowedVoices = null) {
+        await this.initialize();
+
+        if (this.useDatabase) {
+            try {
+                const result = await database.updateEngineConfig(keyId, engineConfig, allowedVoices);
+                if (!result) {
+                    throw new Error('API key not found');
+                }
+                logger.info(`Updated engine config for key: ${keyId}`);
+                return {
+                    engineConfig: result.engine_config,
+                    allowedVoices: result.allowed_voices
+                };
+            } catch (error) {
+                logger.error('Error updating engine config:', error);
+                throw error;
+            }
+        } else {
+            // File-based storage doesn't support engine config
+            throw new Error('Engine configuration requires database storage');
+        }
+    }
+
+    /**
+     * Get full key details including engine config (for TTS request handling)
+     */
+    async getKeyDetails(keyId) {
+        await this.initialize();
+
+        if (this.useDatabase) {
+            try {
+                const key = await database.getApiKeyById(keyId);
+                if (!key) {
+                    return null;
+                }
+                return {
+                    id: key.id,
+                    name: key.name,
+                    isAdmin: key.is_admin,
+                    active: key.active,
+                    engineConfig: key.engine_config || {},
+                    allowedVoices: key.allowed_voices || null
+                };
+            } catch (error) {
+                logger.error('Error getting key details:', error);
+                return null;
+            }
+        } else {
+            return null;
         }
     }
 

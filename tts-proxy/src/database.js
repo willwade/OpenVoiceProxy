@@ -67,8 +67,27 @@ class Database {
             `);
 
             if (tableCheck.rows[0].exists) {
-                logger.info('Database tables already exist');
-                client.release();
+                logger.info('Database tables already exist, checking for migrations...');
+
+                // Check if engine_config column exists, add if not
+                const columnCheck = await client.query(`
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.columns
+                        WHERE table_name = 'api_keys' AND column_name = 'engine_config'
+                    );
+                `);
+
+                if (!columnCheck.rows[0].exists) {
+                    logger.info('Adding engine_config and allowed_voices columns...');
+                    await client.query(`
+                        ALTER TABLE api_keys
+                        ADD COLUMN IF NOT EXISTS engine_config JSONB DEFAULT '{}',
+                        ADD COLUMN IF NOT EXISTS allowed_voices TEXT[]
+                    `);
+                    logger.info('Migration complete: added engine_config and allowed_voices columns');
+                }
+
+                // Release handled by finally block
                 return;
             }
 
@@ -87,7 +106,9 @@ class Database {
                     expires_at TIMESTAMP WITH TIME ZONE,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     last_used TIMESTAMP WITH TIME ZONE,
-                    request_count INTEGER DEFAULT 0
+                    request_count INTEGER DEFAULT 0,
+                    engine_config JSONB DEFAULT '{}',
+                    allowed_voices TEXT[]
                 )
             `);
 
@@ -249,7 +270,43 @@ class Database {
             'DELETE FROM api_keys WHERE id = $1 RETURNING *',
             [keyId]
         );
-        
+
+        return result.rows[0] || null;
+    }
+
+    async getEngineConfig(keyId) {
+        const result = await this.query(
+            'SELECT engine_config, allowed_voices FROM api_keys WHERE id = $1',
+            [keyId]
+        );
+
+        if (result.rows[0]) {
+            return {
+                engineConfig: result.rows[0].engine_config || {},
+                allowedVoices: result.rows[0].allowed_voices || null
+            };
+        }
+        return null;
+    }
+
+    async updateEngineConfig(keyId, engineConfig, allowedVoices = null) {
+        const result = await this.query(
+            `UPDATE api_keys
+             SET engine_config = $1, allowed_voices = $2
+             WHERE id = $3
+             RETURNING id, engine_config, allowed_voices`,
+            [JSON.stringify(engineConfig), allowedVoices, keyId]
+        );
+
+        return result.rows[0] || null;
+    }
+
+    async getApiKeyById(keyId) {
+        const result = await this.query(
+            'SELECT * FROM api_keys WHERE id = $1',
+            [keyId]
+        );
+
         return result.rows[0] || null;
     }
 
