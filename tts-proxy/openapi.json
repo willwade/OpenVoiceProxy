@@ -7,8 +7,12 @@
   },
   "servers": [
     {
+      "url": "https://openvoiceproxy-2azge.ondigitalocean.app",
+      "description": "Production server"
+    },
+    {
       "url": "http://localhost:3000",
-      "description": "Local server"
+      "description": "Local development"
     }
   ],
   "tags": [
