@@ -59,7 +59,7 @@ services:
     type: SECRET
   - key: DATABASE_URL
     scope: RUN_TIME
-    type: SECRET
+    value: ${openvoiceproxy-db.DATABASE_URL}
   routes:
   - path: /
 databases:
