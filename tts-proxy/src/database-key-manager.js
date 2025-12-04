@@ -109,6 +109,22 @@ class DatabaseKeyManager {
     async validateKey(apiKey) {
         await this.initialize();
 
+        // Check for master admin key from environment variable first
+        // This allows bootstrap access even before database keys are created
+        const envAdminKey = process.env.ADMIN_API_KEY;
+        if (envAdminKey && apiKey === envAdminKey) {
+            logger.debug('Authenticated with environment ADMIN_API_KEY');
+            return {
+                id: 'env-admin',
+                name: 'Environment Admin Key',
+                isAdmin: true,
+                active: true,
+                createdAt: new Date().toISOString(),
+                lastUsed: null,
+                requestCount: 0
+            };
+        }
+
         if (this.useDatabase) {
             try {
                 const keyHash = this.hashApiKey(apiKey);
