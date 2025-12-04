@@ -1,6 +1,12 @@
 const { Pool } = require('pg');
 const logger = require('./logger');
 
+// For DigitalOcean managed databases which use self-signed certs
+// We need to allow unauthorized TLS connections
+if (process.env.NODE_ENV === 'production') {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 class Database {
     constructor() {
         this.pool = null;
