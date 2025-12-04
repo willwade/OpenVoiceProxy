@@ -413,6 +413,71 @@ class DatabaseKeyManager {
             this.fileKeyManager.cleanupUsageLogs();
         }
     }
+
+    /**
+     * Get system credentials (masked for display)
+     */
+    async getSystemCredentials() {
+        await this.initialize();
+
+        if (this.useDatabase) {
+            try {
+                return await database.getSystemCredentials();
+            } catch (error) {
+                logger.error('Error getting system credentials from database:', error);
+                // Fall back to file-based
+                if (this.fileKeyManager) {
+                    return await this.fileKeyManager.getSystemCredentials();
+                }
+                return {};
+            }
+        } else {
+            return await this.fileKeyManager.getSystemCredentials();
+        }
+    }
+
+    /**
+     * Set system credentials for an engine
+     */
+    async setSystemCredentials(engineId, credentials) {
+        await this.initialize();
+
+        if (this.useDatabase) {
+            try {
+                await database.setSystemCredentials(engineId, credentials);
+            } catch (error) {
+                logger.error('Error setting system credentials in database:', error);
+                // Fall back to file-based
+                if (this.fileKeyManager) {
+                    await this.fileKeyManager.setSystemCredentials(engineId, credentials);
+                }
+            }
+        } else {
+            await this.fileKeyManager.setSystemCredentials(engineId, credentials);
+        }
+    }
+
+    /**
+     * Get raw (unmasked) system credentials for an engine
+     */
+    async getRawSystemCredentials(engineId) {
+        await this.initialize();
+
+        if (this.useDatabase) {
+            try {
+                return await database.getRawSystemCredentials(engineId);
+            } catch (error) {
+                logger.error('Error getting raw system credentials from database:', error);
+                // Fall back to file-based
+                if (this.fileKeyManager) {
+                    return await this.fileKeyManager.getRawSystemCredentials(engineId);
+                }
+                return null;
+            }
+        } else {
+            return await this.fileKeyManager.getRawSystemCredentials(engineId);
+        }
+    }
 }
 
 module.exports = DatabaseKeyManager;

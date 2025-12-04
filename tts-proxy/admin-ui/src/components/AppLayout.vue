@@ -34,12 +34,19 @@ function handleLogout() {
               >
                 API Keys
               </router-link>
-              <router-link 
-                to="/engines" 
+              <router-link
+                to="/engines"
                 class="text-gray-600 hover:text-gray-900 transition-colors"
                 active-class="text-blue-600 font-medium"
               >
                 Engines
+              </router-link>
+              <router-link
+                to="/settings"
+                class="text-gray-600 hover:text-gray-900 transition-colors"
+                active-class="text-blue-600 font-medium"
+              >
+                Settings
               </router-link>
             </nav>
           </div>

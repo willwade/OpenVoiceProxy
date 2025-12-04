@@ -281,6 +281,70 @@ class KeyManager {
             this.saveUsageLogs();
         }
     }
+
+    /**
+     * Get system credentials (masked for display)
+     */
+    async getSystemCredentials() {
+        const credentialsFile = path.join(__dirname, '..', 'data', 'system-credentials.json');
+        try {
+            if (fs.existsSync(credentialsFile)) {
+                const data = JSON.parse(fs.readFileSync(credentialsFile, 'utf8'));
+                // Return masked credentials for display
+                const masked = {};
+                for (const [engineId, creds] of Object.entries(data)) {
+                    masked[engineId] = {};
+                    for (const [field, value] of Object.entries(creds)) {
+                        // Show that a value exists but mask it
+                        masked[engineId][field] = value ? '••••••••' : '';
+                    }
+                }
+                return masked;
+            }
+        } catch (error) {
+            logger.error('Error reading system credentials:', error);
+        }
+        return {};
+    }
+
+    /**
+     * Set system credentials for an engine
+     */
+    async setSystemCredentials(engineId, credentials) {
+        const credentialsFile = path.join(__dirname, '..', 'data', 'system-credentials.json');
+        let data = {};
+
+        try {
+            if (fs.existsSync(credentialsFile)) {
+                data = JSON.parse(fs.readFileSync(credentialsFile, 'utf8'));
+            }
+        } catch (error) {
+            logger.warn('Could not read existing credentials file:', error);
+        }
+
+        // Update credentials for this engine
+        data[engineId] = credentials;
+
+        // Save to file
+        fs.writeFileSync(credentialsFile, JSON.stringify(data, null, 2));
+        logger.info(`System credentials updated for engine: ${engineId}`);
+    }
+
+    /**
+     * Get raw system credentials for an engine (for internal use)
+     */
+    async getRawSystemCredentials(engineId) {
+        const credentialsFile = path.join(__dirname, '..', 'data', 'system-credentials.json');
+        try {
+            if (fs.existsSync(credentialsFile)) {
+                const data = JSON.parse(fs.readFileSync(credentialsFile, 'utf8'));
+                return data[engineId] || null;
+            }
+        } catch (error) {
+            logger.error('Error reading system credentials:', error);
+        }
+        return null;
+    }
 }
 
 module.exports = KeyManager;
