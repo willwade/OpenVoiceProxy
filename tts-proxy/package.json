@@ -52,7 +52,8 @@
     "sherpa-onnx-node": "^1.12.0",
     "tar-stream": "^3.1.7",
     "text2wav": "^0.0.14",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "ws": "^8.18.3"
   },
   "optionalDependencies": {
     "sound-play": "^1.1.0",

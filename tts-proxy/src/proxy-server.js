@@ -12,6 +12,7 @@ const AuthMiddleware = require('./auth-middleware');
 const SecurityMiddleware = require('./security-middleware');
 const pcmConvert = require('pcm-convert');
 const ESP32Endpoint = require('./esp32-endpoint');
+const WebSocket = require('ws');
 
 // Debug audio playback imports (loaded when needed)
 let Speaker, wav;
@@ -1700,8 +1701,14 @@ class ProxyServer {
                     return;
                 }
                 
+                // Initialize WebSocket Server
+                // Attach to /api/ws path to avoid conflicts
+                this.wss = new WebSocket.Server({ server: this.server, path: '/api/ws' });
+                this.esp32Endpoint.setupWebSocket(this.wss);
+
                 this.isRunning = true;
                 logger.info(`TTS Proxy server started on port ${this.port}`);
+                logger.info(`WebSocket server initialized at /api/ws`);
                 logger.info(`Health check: http://localhost:${this.port}/health`);
                 logger.info(`Voices endpoint: http://localhost:${this.port}/v1/voices`);
                 resolve();
