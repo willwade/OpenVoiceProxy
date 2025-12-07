@@ -99,6 +99,28 @@ curl -X POST http://localhost:3000/api/speak \
 ```
 Defaults can be set with `ESP32_DEFAULT_ENGINE`, `ESP32_DEFAULT_VOICE`, `ESP32_DEFAULT_SAMPLE_RATE`, and `ESP32_MAX_TEXT_LENGTH` in your `.env`.
 
+### WebSocket (ws/wss) Endpoint
+Use WebSockets when you want a single, long-lived connection (including `wss` when TLS is terminated upstream).
+
+- Connect to `ws(s)://<host>/api/ws` with `?api_key=...` or headers `X-API-Key`/`xi-api-key`/`Authorization: Bearer <key>`.
+- Commands:
+  - `{"type":"speak","text":"Hello","voice":"en-US-JennyNeural","engine":"azure","format":"pcm16","sample_rate":16000}` → streams binary audio.
+  - `{"type":"voices"}` → returns JSON list of available voices.
+  - `{"type":"engines"}` → returns JSON of available engines and the default engine.
+- Quick test with `wscat`:
+  ```bash
+  npx wscat -c "ws://localhost:3000/api/ws?api_key=dev"
+  # then send:
+  # {"type":"engines"}
+  # {"type":"speak","text":"Hello from WebSocket","engine":"azure","voice":"en-US-JennyNeural","format":"pcm16","sample_rate":16000}
+  ```
+- Local `wss` check (self-signed):
+  ```bash
+  node generate-cert.js
+  npx local-ssl-proxy --source 3443 --target 3000 --key server.key --cert server.crt
+  npx wscat -c "wss://localhost:3443/api/ws?api_key=dev" --no-check
+  ```
+
 ## Admin API
 
 Manage API keys and monitor TTS engines. All admin endpoints require an admin API key via `X-API-Key` header.
