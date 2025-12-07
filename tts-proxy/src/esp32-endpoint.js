@@ -58,6 +58,284 @@ class ESP32Endpoint {
         logger.info('ESP32 /api/speak endpoint registered');
     }
 
+    setupWebSocket(wss) {
+        wss.on('connection', async (ws, req) => {
+            // Check authentication
+            const authenticated = await this.authenticateWebSocket(ws, req);
+            if (!authenticated) {
+                // Connection is closed in authenticateWebSocket
+                return;
+            }
+
+            logger.info('ESP32 WebSocket connected and authenticated');
+
+            ws.on('message', async (message) => {
+                try {
+                    // Try to parse as JSON first (command)
+                    let command;
+                    try {
+                        command = JSON.parse(message);
+                    } catch (e) {
+                        logger.warn('Received non-JSON message from WebSocket client');
+                        ws.send(JSON.stringify({ error: 'Invalid JSON', code: 'INVALID_JSON' }));
+                        return;
+                    }
+
+                    // Handle different command types
+                    if (command.type === 'speak' || !command.type) {
+                        // Default to speak if no type, or explicit type 'speak'
+                        await this.handleWebSocketSpeak(ws, command);
+                    } else if (command.type === 'voices') {
+                        await this.handleWebSocketVoices(ws, command);
+                    } else if (command.type === 'engines') {
+                        await this.handleWebSocketEngines(ws, command);
+                    } else {
+                        ws.send(JSON.stringify({ error: 'Unknown command type', code: 'UNKNOWN_COMMAND' }));
+                    }
+
+                } catch (error) {
+                    logger.error('WebSocket message handling error:', error);
+                    try {
+                        ws.send(JSON.stringify({ error: error.message, code: 'INTERNAL_ERROR' }));
+                    } catch (sendError) {
+                        // Ignore if socket is closed
+                    }
+                }
+            });
+
+            ws.on('close', () => {
+                logger.info('ESP32 WebSocket disconnected');
+            });
+
+            ws.on('error', (error) => {
+                logger.error('ESP32 WebSocket error:', error);
+            });
+        });
+
+        logger.info('ESP32 WebSocket handler initialized');
+    }
+
+    async handleWebSocketSpeak(ws, command) {
+        const startTime = Date.now();
+
+        try {
+            const {
+                text,
+                voice = this.defaultVoice,
+                engine = this.defaultEngine,
+                ssml = false,
+                format = 'pcm16',
+                sample_rate = this.defaultSampleRate
+            } = command;
+
+            // Validate required fields
+            if (!text || typeof text !== 'string' || text.trim().length === 0) {
+                ws.send(JSON.stringify({
+                    error: 'Missing or empty "text" field',
+                    code: 'INVALID_TEXT'
+                }));
+                return;
+            }
+
+            // Limit text length for embedded devices
+            const maxLength = parseInt(process.env.ESP32_MAX_TEXT_LENGTH) || 500;
+            if (text.length > maxLength) {
+                ws.send(JSON.stringify({
+                    error: `Text exceeds maximum length of ${maxLength} characters`,
+                    code: 'TEXT_TOO_LONG'
+                }));
+                return;
+            }
+
+            logger.info(`ESP32 WS speak request: engine=${engine}, voice=${voice}, format=${format}, len=${text.length}`);
+
+            // Get TTS client for requested engine
+            const ttsClient = this.getTTSClient(engine);
+            if (!ttsClient) {
+                ws.send(JSON.stringify({
+                    error: `Engine "${engine}" not available`,
+                    code: 'ENGINE_NOT_AVAILABLE',
+                    available_engines: Array.from(this.proxyServer.ttsClients.keys())
+                        .filter(k => !k.includes('-mp3'))
+                }));
+                return;
+            }
+
+            // Set voice
+            if (ttsClient.setVoice) {
+                ttsClient.setVoice(voice);
+            }
+
+            // Synthesize speech
+            let audioBytes;
+            const synthOptions = { ssml };
+
+            // Request appropriate format from engine
+            if (format === 'wav') {
+                synthOptions.format = 'wav';
+            } else if (format === 'mp3') {
+                synthOptions.format = 'mp3';
+            } else {
+                // PCM - most engines return WAV, we'll strip the header
+                synthOptions.format = 'wav';
+            }
+
+            audioBytes = await ttsClient.synthToBytes(text, synthOptions);
+
+            if (!audioBytes || audioBytes.length === 0) {
+                throw new Error('No audio data generated');
+            }
+
+            // Convert to requested format
+            let finalAudio = Buffer.from(audioBytes);
+            let actualSampleRate = sample_rate;
+
+            if (format === 'pcm16') {
+                // Strip WAV header, extract PCM
+                const pcmResult = this.extractPCM(finalAudio);
+                finalAudio = pcmResult.pcm;
+                actualSampleRate = pcmResult.sampleRate || sample_rate;
+            }
+
+            // Send metadata first (optional, but good for client to prepare)
+            // Note: In pure binary streaming, we might just send the binary data.
+            // But usually it's good to send a JSON header or just rely on the protocol.
+            // The memory said "streams binary audio data in response".
+            // So we will just send the binary data.
+
+            // However, sending error messages as JSON and success as Binary might be ambiguous if not framed.
+            // Standard WebSocket practice for mixed types usually involves a protocol.
+            // Since the requirement is simple, let's assume binary frame = audio.
+
+            if (ws.readyState === ws.OPEN) {
+                ws.send(finalAudio);
+                logger.info(`ESP32 WS speak complete: ${finalAudio.length} bytes in ${Date.now() - startTime}ms`);
+            }
+
+        } catch (error) {
+            logger.error('ESP32 WS speak error:', error);
+            if (ws.readyState === ws.OPEN) {
+                ws.send(JSON.stringify({
+                    error: error.message || 'TTS synthesis failed',
+                    code: 'SYNTHESIS_ERROR'
+                }));
+            }
+        }
+    }
+
+    async handleWebSocketVoices(ws, command) {
+        try {
+            const { engine } = command;
+            const voices = [];
+            const engines = engine ? [engine] : Array.from(this.proxyServer.ttsClients.keys());
+
+            for (const eng of engines) {
+                if (eng.includes('-mp3')) continue;
+                const client = this.proxyServer.ttsClients.get(eng);
+                if (!client) continue;
+
+                try {
+                    const engineVoices = await client.getVoices();
+                    for (const v of engineVoices) {
+                        voices.push({
+                            id: v.id,
+                            name: v.name,
+                            language: v.language || 'en',
+                            engine: eng
+                        });
+                    }
+                } catch (e) {
+                    logger.warn(`Failed to get voices from ${eng}: ${e.message}`);
+                }
+            }
+
+            if (ws.readyState === ws.OPEN) {
+                ws.send(JSON.stringify({ type: 'voices', voices, count: voices.length }));
+            }
+        } catch (error) {
+            logger.error('WS Error getting voices:', error);
+            if (ws.readyState === ws.OPEN) {
+                ws.send(JSON.stringify({ error: 'Failed to get voices', code: 'VOICES_ERROR' }));
+            }
+        }
+    }
+
+    async handleWebSocketEngines(ws, command) {
+        const engines = Array.from(this.proxyServer.ttsClients.keys())
+            .filter(k => !k.includes('-mp3'))
+            .map(k => ({
+                id: k,
+                name: k.charAt(0).toUpperCase() + k.slice(1),
+                available: true
+            }));
+
+        if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'engines',
+                engines,
+                default: this.defaultEngine
+            }));
+        }
+    }
+
+    async authenticateWebSocket(ws, req) {
+        try {
+            // Check if we are in development mode (skip auth)
+            if (this.proxyServer.authMiddleware.isDevelopmentMode()) {
+                return true;
+            }
+
+            // Extract API key from query string or headers
+            let apiKey = null;
+
+            // 1. Check query string: ?api_key=...
+            const url = new URL(req.url, 'http://localhost'); // Base URL needed for parsing
+            apiKey = url.searchParams.get('api_key');
+
+            // 2. Check headers (Upgrade request headers)
+            if (!apiKey) {
+                apiKey = req.headers['x-api-key'] || req.headers['xi-api-key'];
+            }
+
+            // 3. Check Authorization header
+            if (!apiKey && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+                apiKey = req.headers.authorization.substring(7);
+            }
+
+            if (!apiKey) {
+                logger.warn('WebSocket connection rejected: Missing API key');
+                ws.close(1008, 'API key required'); // 1008 Policy Violation
+                return false;
+            }
+
+            // Validate API key
+            const keyManager = this.proxyServer.keyManager;
+            const keyInfo = await keyManager.validateKey(apiKey);
+
+            if (!keyInfo) {
+                logger.warn('WebSocket connection rejected: Invalid API key');
+                ws.close(1008, 'Invalid API key');
+                return false;
+            }
+
+            if (!keyInfo.active) {
+                logger.warn('WebSocket connection rejected: API key disabled');
+                ws.close(1008, 'API key is disabled');
+                return false;
+            }
+
+            // Log successful auth (optional, but good for tracking)
+            logger.debug(`WebSocket authenticated for key: ${keyInfo.name} (${keyInfo.id})`);
+
+            return true;
+
+        } catch (error) {
+            logger.error('WebSocket authentication error:', error);
+            ws.close(1011, 'Internal Server Error'); // 1011 Internal Error
+            return false;
+        }
+    }
+
     async handleSpeak(req, res) {
         const startTime = Date.now();
         
