@@ -168,7 +168,12 @@ class ESP32Endpoint {
 
             // Synthesize speech
             let audioBytes;
-            const synthOptions = { ssml };
+            // Ask engine for the desired sample rate when possible
+            const synthOptions = {
+                ssml,
+                sampleRateHz: sample_rate,
+                sampleRate: sample_rate
+            };
 
             // Request appropriate format from engine
             if (format === 'wav') {
@@ -197,17 +202,18 @@ class ESP32Endpoint {
                 actualSampleRate = pcmResult.sampleRate || sample_rate;
             }
 
-            // Send metadata first (optional, but good for client to prepare)
-            // Note: In pure binary streaming, we might just send the binary data.
-            // But usually it's good to send a JSON header or just rely on the protocol.
-            // The memory said "streams binary audio data in response".
-            // So we will just send the binary data.
-
-            // However, sending error messages as JSON and success as Binary might be ambiguous if not framed.
-            // Standard WebSocket practice for mixed types usually involves a protocol.
-            // Since the requirement is simple, let's assume binary frame = audio.
-
             if (ws.readyState === ws.OPEN) {
+                // Send a small JSON metadata frame so clients know the sample rate/format
+                ws.send(JSON.stringify({
+                    type: 'meta',
+                    format,
+                    sample_rate: actualSampleRate,
+                    engine,
+                    voice,
+                    bytes: finalAudio.length
+                }));
+
+                // Then send the raw audio as a binary frame
                 ws.send(finalAudio);
                 logger.info(`ESP32 WS speak complete: ${finalAudio.length} bytes in ${Date.now() - startTime}ms`);
             }
