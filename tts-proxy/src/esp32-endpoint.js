@@ -125,7 +125,9 @@ class ESP32Endpoint {
                 engine = this.defaultEngine,
                 ssml = false,
                 format = 'pcm16',
-                sample_rate = this.defaultSampleRate
+                sample_rate = this.defaultSampleRate,
+                stream = false,
+                chunk_size = 32000
             } = command;
 
             // Validate required fields
@@ -167,7 +169,6 @@ class ESP32Endpoint {
             }
 
             // Synthesize speech
-            let audioBytes;
             // Ask engine for the desired sample rate when possible
             const synthOptions = {
                 ssml,
@@ -185,37 +186,102 @@ class ESP32Endpoint {
                 synthOptions.format = 'wav';
             }
 
-            audioBytes = await ttsClient.synthToBytes(text, synthOptions);
-
-            if (!audioBytes || audioBytes.length === 0) {
-                throw new Error('No audio data generated');
-            }
-
-            // Convert to requested format
-            let finalAudio = Buffer.from(audioBytes);
             let actualSampleRate = sample_rate;
+            const chunkSize = parseInt(chunk_size, 10) > 0 ? parseInt(chunk_size, 10) : 32000;
+            let totalBytesSent = 0;
+            let chunksSent = 0;
 
-            if (format === 'pcm16') {
-                // Strip WAV header, extract PCM
-                const pcmResult = this.extractPCM(finalAudio);
-                finalAudio = pcmResult.pcm;
-                actualSampleRate = pcmResult.sampleRate || sample_rate;
-            }
+            const sendChunk = (buf) => {
+                if (ws.readyState !== ws.OPEN) return;
+                let offset = 0;
+                while (offset < buf.length) {
+                    const end = Math.min(offset + chunkSize, buf.length);
+                    const slice = buf.slice(offset, end);
+                    ws.send(slice);
+                    totalBytesSent += slice.length;
+                    chunksSent += 1;
+                    offset = end;
+                }
+            };
+
+            const sendMeta = (bytes, extra = {}) => {
+                if (ws.readyState === ws.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'meta',
+                        format,
+                        sample_rate: actualSampleRate,
+                        engine,
+                        voice,
+                        bytes,
+                        stream: !!stream,
+                        chunk_size: stream ? chunkSize : undefined,
+                        chunks: bytes && stream ? Math.ceil(bytes / chunkSize) : (stream ? undefined : 1),
+                        ...extra
+                    }));
+                }
+            };
+
+            const sendEndSummary = (elapsedMs) => {
+                if (ws.readyState === ws.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'end',
+                        bytes: totalBytesSent,
+                        chunks: chunksSent,
+                        elapsed_ms: elapsedMs
+                    }));
+                }
+            };
+
+            const convertIfNeeded = (audioBuf) => {
+                let finalAudio = Buffer.from(audioBuf);
+                if (format === 'pcm16') {
+                    const pcmResult = this.extractPCM(finalAudio);
+                    finalAudio = pcmResult.pcm;
+                    actualSampleRate = pcmResult.sampleRate || sample_rate;
+                }
+                return finalAudio;
+            };
 
             if (ws.readyState === ws.OPEN) {
-                // Send a small JSON metadata frame so clients know the sample rate/format
-                ws.send(JSON.stringify({
-                    type: 'meta',
-                    format,
-                    sample_rate: actualSampleRate,
-                    engine,
-                    voice,
-                    bytes: finalAudio.length
-                }));
+                if (stream && typeof ttsClient.synthToStream === 'function') {
+                    // Try wrapper streaming API (may buffer internally, but we chunk as we receive)
+                    sendMeta(undefined);
+                    await ttsClient.synthToStream(
+                        text,
+                        (audioChunk) => {
+                            const buf = convertIfNeeded(audioChunk);
+                            sendChunk(buf);
+                        },
+                        null,
+                        () => {
+                            sendEndSummary(Date.now() - startTime);
+                            logger.info(`ESP32 WS streamed ${totalBytesSent} bytes in ${Date.now() - startTime}ms`);
+                        },
+                        null,
+                        synthOptions
+                    );
+                } else {
+                    // Fallback: synth then chunk or single send
+                    const audioBytes = await ttsClient.synthToBytes(text, synthOptions);
 
-                // Then send the raw audio as a binary frame
-                ws.send(finalAudio);
-                logger.info(`ESP32 WS speak complete: ${finalAudio.length} bytes in ${Date.now() - startTime}ms`);
+                    if (!audioBytes || audioBytes.length === 0) {
+                        throw new Error('No audio data generated');
+                    }
+
+                    const finalAudio = convertIfNeeded(audioBytes);
+
+                    if (stream) {
+                        sendMeta(finalAudio.length);
+                        sendChunk(finalAudio);
+                        sendEndSummary(Date.now() - startTime);
+                        logger.info(`ESP32 WS streamed ${finalAudio.length} bytes in ${Date.now() - startTime}ms`);
+                    } else {
+                        // Send meta + single binary frame
+                        sendMeta(finalAudio.length, { chunks: 1 });
+                        ws.send(finalAudio);
+                        logger.info(`ESP32 WS speak complete: ${finalAudio.length} bytes in ${Date.now() - startTime}ms`);
+                    }
+                }
             }
 
         } catch (error) {

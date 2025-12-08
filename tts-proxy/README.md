@@ -107,7 +107,8 @@ Use WebSockets when you want a single, long-lived connection (including `wss` wh
   - `{"type":"speak","text":"Hello","voice":"en-US-JennyNeural","engine":"azure","format":"pcm16","sample_rate":16000}` → streams binary audio.
   - `{"type":"voices"}` → returns JSON list of available voices.
   - `{"type":"engines"}` → returns JSON of available engines and the default engine.
-- Server sends a small JSON metadata frame first (e.g., `{"type":"meta","sample_rate":24000,"format":"pcm16","engine":"azure","voice":"en-US-JennyNeural","bytes":12345}`) so clients can play PCM at the correct rate, followed by the binary audio frame.
+- Server sends a small JSON metadata frame first (e.g., `{"type":"meta","sample_rate":24000,"format":"pcm16","engine":"azure","voice":"en-US-JennyNeural","bytes":12345,"stream":true,"chunks":5,"chunk_size":32000}`) so clients can play PCM at the correct rate, followed by the binary audio frame(s).
+- To get chunked streaming over WebSocket, add `"stream": true` (optional `"chunk_size": 32000` bytes). The server will still send the meta frame first, then audio chunks; your client must ignore the meta frame and concatenate only the binary frames.
 - Quick test with `wscat`:
   ```bash
   npx wscat -c "ws://localhost:3000/api/ws?api_key=dev"
