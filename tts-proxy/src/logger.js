@@ -1,19 +1,8 @@
 const winston = require('winston');
 const path = require('path');
 
-// Try to get electron app for user data path, fall back to ./logs for production
-let userDataPath = './logs';
-try {
-    if (process.env.NODE_ENV !== 'production') {
-        const { app } = require('electron');
-        if (app && typeof app.getPath === 'function') {
-            userDataPath = app.getPath('userData');
-        }
-    }
-} catch (e) {
-    // Electron not available (production server mode)
-}
-
+const { getDataDir } = require('./data-path');
+const userDataPath = getDataDir();
 const logPath = path.join(userDataPath, 'tts-proxy.log');
 
 const isProduction = process.env.NODE_ENV === 'production';

@@ -2,6 +2,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const ProxyServer = require('./proxy-server');
 const logger = require('./logger');
+const { migrateRepoData } = require('./data-path');
 
 class TtsProxyApp {
     constructor() {
@@ -12,14 +13,26 @@ class TtsProxyApp {
 
     async initialize() {
         logger.info('Initializing TTS Proxy App');
-        
+
+        // Set local mode for Electron app (skip authentication)
+        process.env.LOCAL_MODE = 'true';
+        logger.info('Running in LOCAL_MODE - authentication disabled for desktop app');
+
+        // Migrate any existing repo `data/` files into the runtime userData location
+        try {
+            migrateRepoData();
+            logger.info('Repository data migration (if any) completed');
+        } catch (e) {
+            logger.warn('Repository data migration failed:', e.message || e);
+        }
+
         // Create proxy server
         this.proxyServer = new ProxyServer();
         await this.proxyServer.start();
-        
+
         // Create system tray
         this.createTray();
-        
+
         logger.info('TTS Proxy App initialized successfully');
     }
 
@@ -46,7 +59,18 @@ class TtsProxyApp {
             },
             { type: 'separator' },
             {
-                label: 'Show Configuration',
+                label: 'Open Admin Interface',
+                type: 'normal',
+                click: () => this.openUrl('http://localhost:3000/admin/')
+            },
+            {
+                label: 'Open Configuration',
+                type: 'normal',
+                click: () => this.openUrl('http://localhost:3000/admin/config')
+            },
+            { type: 'separator' },
+            {
+                label: 'Show Local Config',
                 type: 'normal',
                 click: () => this.showConfigWindow()
             },
@@ -92,6 +116,11 @@ class TtsProxyApp {
 
     showLogs() {
         logger.info('Opening logs (placeholder - will implement log viewer)');
+    }
+
+    openUrl(url) {
+        const { shell } = require('electron');
+        shell.openExternal(url);
     }
 
     async shutdown() {

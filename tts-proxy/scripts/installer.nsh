@@ -1,63 +1,69 @@
 ; Custom installer script for OpenVoiceProxy
+; Per-user installation (no admin required)
 
-; Page to select additional components
-!macro customInstallComponents
-  !insertmacro MUI_PAGE_COMPONENTS
+; Custom install mode - set to current user
+!macro customInstallMode
+  SetShellVarContext current
 !macroend
 
-; Define additional components
+; Initialize - ask about startup
 !macro customInit
-  ; Add CLI Tool component
-  !insertmacro MUI_INSTALLOPTIONS_WRITE "ioSpecialIni" "settings" "NumComponents" "2"
-  !insertmacro MUI_INSTALLOPTIONS_WRITE "ioSpecialIni" "settings" "ComponentText1" "Install CLI Tool"
-  !insertmacro MUI_INSTALLOPTIONS_WRITE "ioSpecialIni" "settings" "ComponentText2" "Create Desktop Shortcut"
+  ; We'll use a simple MessageBox instead of custom page
 !macroend
 
-; Section for CLI Tool
-Section "CLI Tool" SecCLI
-  SectionIn RO ; Read-only section (cannot be deselected)
+; After installation files are copied
+!macro customInstall
+  ; Ask user if they want to run on startup
+  MessageBox MB_YESNO "Do you want OpenVoiceProxy to start automatically when Windows starts?" IDYES startup IDNO nostartup
+  startup:
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "OpenVoiceProxy" "$INSTDIR\OpenVoiceProxy.exe"
+    Goto done
+  nostartup:
+    ; Don't add to startup
+  done:
+!macroend
 
-  ; Create directory for CLI tool
-  CreateDirectory "$INSTDIR\cli"
+; After installation is complete
+!macro customInstallFinish
+  ; Create shortcuts in user's start menu
+  CreateDirectory "$SMPROGRAMS\OpenVoiceProxy"
+  CreateShortCut "$SMPROGRAMS\OpenVoiceProxy\OpenVoiceProxy.lnk" "$INSTDIR\OpenVoiceProxy.exe" "" "$INSTDIR\OpenVoiceProxy.exe" 0
+  CreateShortCut "$SMPROGRAMS\OpenVoiceProxy\Admin Interface.lnk" "http://localhost:3000/admin/" "" "$INSTDIR\OpenVoiceProxy.exe" 0
+  CreateShortCut "$SMPROGRAMS\OpenVoiceProxy\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
+  ; Ensure user data directory exists and create default empty data files
+  CreateDirectory "$APPDATA\OpenVoiceProxy\data"
+  ; Create empty JSON files if they don't exist
+  IfFileExists "$APPDATA\OpenVoiceProxy\data\system-credentials.json" 0 +2
+  Goto +3
+  ; Write empty JSON object
+  FileOpen $0 "$APPDATA\OpenVoiceProxy\data\system-credentials.json" w
+  FileWrite $0 "{}"
+  FileClose $0
+  IfFileExists "$APPDATA\OpenVoiceProxy\data\api-keys.json" 0 +2
+  Goto +3
+  FileOpen $0 "$APPDATA\OpenVoiceProxy\data\api-keys.json" w
+  FileWrite $0 "[]"
+  FileClose $0
+  IfFileExists "$APPDATA\OpenVoiceProxy\data\usage-logs.json" 0 +2
+  Goto +3
+  FileOpen $0 "$APPDATA\OpenVoiceProxy\data\usage-logs.json" w
+  FileWrite $0 "[]"
+  FileClose $0
+!macroend
 
-  ; Copy CLI files
-  File /r "${NSISDIR}\..\cli\*.*" "$INSTDIR\cli\"
+; Uninstall initialization
+!macro customUnInit
+  SetShellVarContext current
+!macroend
 
-  ; Add CLI directory to PATH
-  ${EnvVarUpdate} $0 "PATH" "A" "HKLM" "$INSTDIR\cli"
+; During uninstall
+!macro customUnInstall
+  ; Remove from startup
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "OpenVoiceProxy"
 
-  ; Write registry entries for CLI tool
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}_CLI" "DisplayName" "${PRODUCT_NAME} CLI Tool"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}_CLI" "UninstallString" "$INSTDIR\uninstall_cli.exe"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}_CLI" "DisplayIcon" "$INSTDIR\cli\CallTTS.exe"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}_CLI" "Publisher" "${PRODUCT_PUBLISHER}"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}_CLI" "DisplayVersion" "${PRODUCT_VERSION}"
+  ; Remove start menu folder
+  RMDir /r "$SMPROGRAMS\OpenVoiceProxy"
 
-  ; Create uninstaller for CLI
-  WriteUninstaller "$INSTDIR\uninstall_cli.exe"
-SectionEnd
-
-; Custom uninstall function
-Function un.customUnInit
-  ; Remove CLI directory from PATH
-  ${un.EnvVarUpdate} $0 "PATH" "R" "HKLM" "$INSTDIR\cli"
-
-  ; Delete registry entries for CLI tool
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}_CLI"
-FunctionEnd
-
-; CLI Tool uninstall section
-Section "un.CLI Tool" un.SecCLI
-  ; Delete CLI files
-  RMDir /r "$INSTDIR\cli"
-
-  ; Delete CLI uninstaller
-  Delete "$INSTDIR\uninstall_cli.exe"
-SectionEnd
-
-; Create start menu shortcuts
-Function customFinish
-  CreateShortCut "$SMPROGRAMS\OpenVoiceProxy.lnk" "$INSTDIR\OpenVoiceProxy.exe" "" "$INSTDIR\OpenVoiceProxy.exe" 0
-  CreateShortCut "$SMPROGRAMS\CLI Config Generator.lnk" "http://localhost:3000/admin/cli-config" "" "$INSTDIR\OpenVoiceProxy.exe" 0
-  CreateShortCut "$SMPROGRAMS\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-FunctionEnd
+  ; Remove desktop shortcut if it exists
+  Delete "$DESKTOP\OpenVoiceProxy.lnk"
+!macroend

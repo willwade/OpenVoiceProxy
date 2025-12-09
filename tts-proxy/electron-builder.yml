@@ -8,21 +8,38 @@ files:
   - package.json
   - cli/**/*
   - config.json
+  - public/**/*
+  - ui/**/*
+  - assets/**/*
+  - server-production.js
 extraResources:
   - from: cli
     to: cli
     filter:
       - "**/*"
+# Only build for Windows (no macOS)
+mac:
+  target: []
 win:
   target:
     - target: nsis
       arch:
         - x64
   icon: assets/icon.ico
+  # Completely disable code signing
+  signingHashAlgorithms: []
+  verifyUpdateCodeSignature: false
+  signDlls: false
 nsis:
   oneClick: false
+  # Per-user installation (no admin required)
+  perMachine: false
   allowToChangeInstallationDirectory: true
+  allowElevation: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: OpenVoiceProxy
+  # Run on startup option
+  runAfterFinish: true
+  menuCategory: true
   include: scripts/installer.nsh

@@ -17,14 +17,17 @@ export const useAuthStore = defineStore('auth', () => {
   // Actions
   async function checkDevelopmentMode(): Promise<boolean> {
     try {
-      const response = await fetch('/admin/api/keys')
+      const response = await fetch('/admin/api/mode')
       if (response.ok) {
-        isDevelopmentMode.value = true
-        user.value = { id: 'dev', name: 'Development User', isAdmin: true }
-        return true
+        const data = await response.json()
+        if (data.isDevelopmentMode) {
+          isDevelopmentMode.value = true
+          user.value = { id: 'dev', name: 'Development User', isAdmin: true }
+          return true
+        }
       }
     } catch {
-      // Production mode
+      // Connection error, production mode
     }
     return false
   }

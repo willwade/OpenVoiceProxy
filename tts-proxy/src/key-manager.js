@@ -2,11 +2,14 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
+const { getDataDir } = require('./data-path');
 
 class KeyManager {
     constructor() {
-        this.keysFile = path.join(__dirname, '..', 'data', 'api-keys.json');
-        this.usageFile = path.join(__dirname, '..', 'data', 'usage-logs.json');
+        const dataDir = getDataDir();
+        this.keysFile = path.join(dataDir, 'api-keys.json');
+        this.usageFile = path.join(dataDir, 'usage-logs.json');
+        this.credentialsFile = path.join(dataDir, 'system-credentials.json');
         this.keys = new Map();
         this.usageLogs = [];
         
@@ -23,9 +26,14 @@ class KeyManager {
      */
     ensureDataDirectory() {
         const dataDir = path.dirname(this.keysFile);
-        if (!fs.existsSync(dataDir)) {
-            fs.mkdirSync(dataDir, { recursive: true });
-            logger.info('Created data directory:', dataDir);
+        try {
+            if (!fs.existsSync(dataDir)) {
+                fs.mkdirSync(dataDir, { recursive: true });
+                logger.info('Created data directory:', dataDir);
+            }
+        } catch (e) {
+            logger.error('Failed to ensure data directory exists:', e);
+            throw e;
         }
     }
 
@@ -286,10 +294,9 @@ class KeyManager {
      * Get system credentials (masked for display)
      */
     async getSystemCredentials() {
-        const credentialsFile = path.join(__dirname, '..', 'data', 'system-credentials.json');
         try {
-            if (fs.existsSync(credentialsFile)) {
-                const data = JSON.parse(fs.readFileSync(credentialsFile, 'utf8'));
+            if (fs.existsSync(this.credentialsFile)) {
+                const data = JSON.parse(fs.readFileSync(this.credentialsFile, 'utf8'));
                 // Return masked credentials for display
                 const masked = {};
                 for (const [engineId, creds] of Object.entries(data)) {
@@ -311,12 +318,11 @@ class KeyManager {
      * Set system credentials for an engine
      */
     async setSystemCredentials(engineId, credentials) {
-        const credentialsFile = path.join(__dirname, '..', 'data', 'system-credentials.json');
         let data = {};
 
         try {
-            if (fs.existsSync(credentialsFile)) {
-                data = JSON.parse(fs.readFileSync(credentialsFile, 'utf8'));
+            if (fs.existsSync(this.credentialsFile)) {
+                data = JSON.parse(fs.readFileSync(this.credentialsFile, 'utf8'));
             }
         } catch (error) {
             logger.warn('Could not read existing credentials file:', error);
@@ -326,18 +332,22 @@ class KeyManager {
         data[engineId] = credentials;
 
         // Save to file
-        fs.writeFileSync(credentialsFile, JSON.stringify(data, null, 2));
-        logger.info(`System credentials updated for engine: ${engineId}`);
+        try {
+            fs.writeFileSync(this.credentialsFile, JSON.stringify(data, null, 2));
+            logger.info(`System credentials updated for engine: ${engineId}`);
+        } catch (e) {
+            logger.error('Failed to write system credentials file:', e);
+            throw e;
+        }
     }
 
     /**
      * Get raw system credentials for an engine (for internal use)
      */
     async getRawSystemCredentials(engineId) {
-        const credentialsFile = path.join(__dirname, '..', 'data', 'system-credentials.json');
         try {
-            if (fs.existsSync(credentialsFile)) {
-                const data = JSON.parse(fs.readFileSync(credentialsFile, 'utf8'));
+            if (fs.existsSync(this.credentialsFile)) {
+                const data = JSON.parse(fs.readFileSync(this.credentialsFile, 'utf8'));
                 return data[engineId] || null;
             }
         } catch (error) {

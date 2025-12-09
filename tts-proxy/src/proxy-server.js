@@ -699,6 +699,12 @@ class ProxyServer {
         this.app.get('/v1/user', this.getUser.bind(this));
         this.app.get('/v1/models', this.getModels.bind(this));
 
+        // Public endpoint to check if running in development/local mode (for frontend)
+        this.app.get('/admin/api/mode', (req, res) => {
+            const isDevelopmentMode = this.authMiddleware.isDevelopmentMode();
+            res.json({ isDevelopmentMode });
+        });
+
         // Admin routes (require admin API key)
         this.app.use('/admin/api', this.authMiddleware.authenticate({ adminOnly: true }));
         this.app.get('/admin/api/keys', this.adminListKeys.bind(this));
