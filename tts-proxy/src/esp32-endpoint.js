@@ -279,6 +279,7 @@ class ESP32Endpoint {
                         // Send meta + single binary frame
                         sendMeta(finalAudio.length, { chunks: 1 });
                         ws.send(finalAudio);
+                        sendEndSummary(Date.now() - startTime);
                         logger.info(`ESP32 WS speak complete: ${finalAudio.length} bytes in ${Date.now() - startTime}ms`);
                     }
                 }

@@ -10,6 +10,7 @@ const EnvironmentLoader = require('./env-loader');
 const DatabaseKeyManager = require('./database-key-manager');
 const AuthMiddleware = require('./auth-middleware');
 const SecurityMiddleware = require('./security-middleware');
+const TranslationService = require('./translation-service');
 const pcmConvert = require('pcm-convert');
 const ESP32Endpoint = require('./esp32-endpoint');
 const WebSocket = require('ws');
@@ -42,6 +43,9 @@ class ProxyServer {
         this.keyManager = new DatabaseKeyManager();
         this.authMiddleware = new AuthMiddleware(this.keyManager);
         this.securityMiddleware = new SecurityMiddleware();
+
+        // Initialize translation service
+        this.translationService = new TranslationService();
 
         // Log development mode status
         if (this.authMiddleware.isDevelopmentMode()) {
@@ -710,6 +714,11 @@ class ProxyServer {
         this.app.get('/admin/api/settings/credentials', this.adminGetCredentials.bind(this));
         this.app.put('/admin/api/settings/credentials/:engineId', this.adminUpdateCredentials.bind(this));
         this.app.post('/admin/api/settings/credentials/:engineId/test', this.adminTestCredentials.bind(this));
+
+        // Translation API routes (public - for CLI config generator)
+        this.app.get('/api/translation/languages/google', this.getGoogleLanguages.bind(this));
+        this.app.get('/api/translation/languages/azure', this.getAzureLanguages.bind(this));
+        this.app.get('/api/translation/scripts/azure', this.getAzureScripts.bind(this));
 
         // Admin SPA fallback - serve index.html for all admin routes (except /admin/api)
         this.app.get('/admin/*', (req, res) => {
@@ -1692,6 +1701,46 @@ class ProxyServer {
         }
     }
 
+    // Translation API handlers
+    async getGoogleLanguages(req, res) {
+        try {
+            const languages = await this.translationService.getGoogleLanguages();
+            res.json({ languages });
+        } catch (error) {
+            logger.error('Error fetching Google languages:', error.message);
+            res.status(500).json({
+                error: error.message,
+                hint: 'Set GOOGLE_TRANSLATE_API_KEY environment variable'
+            });
+        }
+    }
+
+    async getAzureLanguages(req, res) {
+        try {
+            const languages = await this.translationService.getAzureLanguages();
+            res.json({ languages });
+        } catch (error) {
+            logger.error('Error fetching Azure languages:', error.message);
+            res.status(500).json({
+                error: error.message,
+                hint: 'Set AZURE_TRANSLATOR_KEY and AZURE_TRANSLATOR_REGION environment variables'
+            });
+        }
+    }
+
+    async getAzureScripts(req, res) {
+        try {
+            const scripts = await this.translationService.getAzureTransliterationScripts();
+            res.json({ scripts });
+        } catch (error) {
+            logger.error('Error fetching Azure scripts:', error.message);
+            res.status(500).json({
+                error: error.message,
+                hint: 'Set AZURE_TRANSLATOR_KEY and AZURE_TRANSLATOR_REGION environment variables'
+            });
+        }
+    }
+
     async start() {
         return new Promise((resolve, reject) => {
             this.server = this.app.listen(this.port, (err) => {
@@ -1700,7 +1749,7 @@ class ProxyServer {
                     reject(err);
                     return;
                 }
-                
+
                 // Initialize WebSocket Server
                 // Attach to /api/ws path to avoid conflicts
                 this.wss = new WebSocket.Server({ server: this.server, path: '/api/ws' });

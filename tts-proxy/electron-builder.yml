@@ -1,0 +1,28 @@
+appId: org.openvoiceproxy.app
+productName: OpenVoiceProxy
+directories:
+  output: dist
+files:
+  - src/**/*
+  - node_modules/**/*
+  - package.json
+  - cli/**/*
+  - config.json
+extraResources:
+  - from: cli
+    to: cli
+    filter:
+      - "**/*"
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: assets/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: OpenVoiceProxy
+  include: scripts/installer.nsh

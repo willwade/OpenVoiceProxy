@@ -1,0 +1,35 @@
+{
+  "server": {
+    "url": "ws://localhost:3000/api/ws",
+    "apiKey": "dev"
+  },
+  "tts": {
+    "engine": "azure",
+    "voice": "ur-PK-AsadNeural",
+    "format": "wav",
+    "sampleRate": 24000
+  },
+  "translation": {
+    "enabled": true,
+    "provider": "azure",
+    "apiKey": "YOUR_AZURE_TRANSLATOR_API_KEY",
+    "sourceLanguage": "en",
+    "targetLanguage": "ur",
+    "transliteration": {
+      "enabled": true,
+      "fromScript": "Latn",
+      "toScript": "Arab"
+    }
+  },
+  "input": {
+    "useClipboard": true,
+    "overwriteClipboardOnCompletion": true
+  },
+  "output": {
+    "playAudio": true,
+    "saveToFile": false,
+    "outputPath": "C:\\AAC\\audio\\urdu-output.wav",
+    "logFile": "C:\\AAC\\logs\\calltts.log"
+  }
+}
+

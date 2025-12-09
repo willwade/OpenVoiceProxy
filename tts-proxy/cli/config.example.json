@@ -1,0 +1,34 @@
+{
+  "server": {
+    "url": "ws://localhost:3000/api/ws",
+    "apiKey": "dev"
+  },
+  "tts": {
+    "engine": "azure",
+    "voice": "en-US-JennyNeural",
+    "format": "wav",
+    "sampleRate": 24000
+  },
+  "translation": {
+    "enabled": false,
+    "provider": "google",
+    "apiKey": "",
+    "sourceLanguage": "auto",
+    "targetLanguage": "en",
+    "transliteration": {
+      "enabled": false,
+      "fromScript": "Latn",
+      "toScript": "Arab"
+    }
+  },
+  "input": {
+    "useClipboard": true,
+    "overwriteClipboardOnCompletion": false
+  },
+  "output": {
+    "playAudio": true,
+    "saveToFile": false,
+    "outputPath": "C:\\AAC\\audio\\output.wav",
+    "logFile": "C:\\AAC\\logs\\calltts.log"
+  }
+}
