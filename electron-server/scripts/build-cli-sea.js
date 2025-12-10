@@ -54,22 +54,33 @@ try {
     // Find sentinel occurrences to avoid "multiple occurrences" error on Windows Node bins
     const exeBuffer = fs.readFileSync(outputExe);
     const sentinel = Buffer.from('NODE_SEA', 'ascii');
-    let offset = exeBuffer.indexOf(sentinel);
-    let next = exeBuffer.indexOf(sentinel, offset + 1);
-    if (next !== -1) {
-        // Use the last occurrence
-        let last = offset;
-        while (next !== -1) {
-            last = next;
-            next = exeBuffer.indexOf(sentinel, last + 1);
+    let offsets = [];
+    let search = 0;
+    while (true) {
+        const idx = exeBuffer.indexOf(sentinel, search);
+        if (idx === -1) break;
+        offsets.push(idx);
+        search = idx + sentinel.length;
+    }
+
+    if (offsets.length === 0) {
+        throw new Error('Sentinel NODE_SEA not found in node.exe');
+    }
+
+    const keepOffset = offsets[offsets.length - 1];
+    if (offsets.length > 1) {
+        console.warn(`[SEA] Multiple sentinel occurrences found. Keeping last at offset ${keepOffset}, zeroing others.`);
+        // Zero out earlier occurrences so postject sees only one sentinel
+        for (let i = 0; i < offsets.length - 1; i++) {
+            const off = offsets[i];
+            exeBuffer.fill(0, off, off + sentinel.length);
         }
-        offset = last;
-        console.warn(`[SEA] Multiple sentinel occurrences found. Using offset ${offset}.`);
+        fs.writeFileSync(outputExe, exeBuffer);
     }
 
     inject(outputExe, 'NODE_SEA_BLOB', blobBuffer, {
         sentinelFuse: 'NODE_SEA',
-        sentinelOffset: offset
+        sentinelOffset: keepOffset
     });
 } catch (err) {
     console.error('[SEA] postject failed:', err.message || err);
