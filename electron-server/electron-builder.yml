@@ -6,17 +6,15 @@ files:
   - src/**/*
   - node_modules/**/*
   - package.json
-  - cli/**/*
-  - config.json
-  - public/**/*
   - ui/**/*
   - assets/**/*
-  - server-production.js
 extraResources:
-  - from: cli
-    to: cli
-    filter:
-      - "**/*"
+  - from: dist/CallTTS.exe
+    to: cli/CallTTS.exe
+  - from: cli/CallTTS.bat
+    to: cli/CallTTS.bat
+  - from: cli/README.md
+    to: cli/README.md
 # Only build for Windows (no macOS)
 mac:
   target: []
@@ -25,7 +23,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: assets/icon.ico
+  icon: assets/icon.png
   # Completely disable code signing
   signingHashAlgorithms: []
   verifyUpdateCodeSignature: false

@@ -1,0 +1,24 @@
+{
+  "name": "openvoiceproxy-electron",
+  "version": "1.0.0",
+  "description": "Electron shell for OpenVoiceProxy with Windows packaging (NSIS)",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win",
+    "build:nsis": "electron-builder --win nsis",
+    "build:cli": "node scripts/build-cli-sea.js",
+    "build:all": "npm --prefix ../tts-proxy run build && npm run build:cli && npm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "openvoiceproxy": "file:../tts-proxy",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3",
+    "postject": "^1.0.0-alpha.6"
+  }
+}

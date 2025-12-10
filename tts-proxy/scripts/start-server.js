@@ -1,4 +1,4 @@
-const ProxyServer = require('./src/proxy-server');
+const ProxyServer = require('../src/proxy-server');
 
 console.log('🚀 Starting TTS Proxy Server');
 console.log('=' .repeat(50));

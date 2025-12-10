@@ -11,6 +11,10 @@ A secure, cloud-ready proxy server that intercepts ElevenLabs API calls and redi
 - **🛡️ Production Ready** - Comprehensive security, logging, and error handling
 - **☁️ Cloud Deployable** - Optimized for DigitalOcean App Platform deployment
 
+## 📁 Project Layout
+- `tts-proxy/` — core HTTP/WebSocket server and admin UI
+- `electron-server/` — Windows-only Electron shell + NSIS packaging that wraps the server and ships the CallTTS CLI
+
 ## 📋 Quick Start (Local Development)
 
 ### Prerequisites
@@ -75,6 +79,17 @@ Open your browser and visit:
 - **Health Check**: http://localhost:3000/health
 - **Admin Interface**: http://localhost:3000/admin
 - **API Documentation**: See endpoints below
+
+## 🖥️ Windows Desktop Build (Electron)
+Electron packaging now lives in `electron-server/` and wraps the same backend for offline/local use.
+
+```bash
+cd electron-server
+npm install
+npm run build:all   # builds server assets, CallTTS.exe (SEA), then the Windows installer (NSIS)
+```
+
+Artifacts land in `electron-server/dist/`. Build scripts are intended to be run on Windows.
 
 ## 🔧 API Endpoints
 

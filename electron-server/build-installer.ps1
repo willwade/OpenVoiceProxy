@@ -6,6 +6,15 @@ Write-Host "OpenVoiceProxy Installer Build Script" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Ensure we are in electron-server
+$expected = Split-Path -Leaf $PSScriptRoot
+if ($expected -ne "electron-server") {
+    Write-Host "ERROR: Please run this script from the electron-server directory." -ForegroundColor Red
+    Write-Host "Current directory: $PSScriptRoot" -ForegroundColor Red
+    exit 1
+}
+Write-Host ""
+
 # Step 1: Clear electron-builder cache to avoid symbolic link issues
 Write-Host "[1/4] Clearing electron-builder cache..." -ForegroundColor Yellow
 $cacheDir = "$env:LOCALAPPDATA\electron-builder\Cache\winCodeSign"
@@ -43,10 +52,10 @@ Remove-Item Env:\CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
 Write-Host "      CSC_IDENTITY_AUTO_DISCOVERY=false" -ForegroundColor Green
 Write-Host "      Code signing variables cleared" -ForegroundColor Green
 
-# Step 4: Build the installer
-Write-Host "[4/4] Building Electron app..." -ForegroundColor Yellow
+# Step 4: Build the installer (runs server build, CLI SEA build, then Electron/NSIS)
+Write-Host "[4/4] Building Electron app + CLI (SEA)..." -ForegroundColor Yellow
 Write-Host ""
-npm run build:electron
+npm run build:all
 
 # Check if build was successful
 if ($LASTEXITCODE -eq 0) {
@@ -82,4 +91,3 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "If you see symbolic link errors, try running PowerShell as Administrator." -ForegroundColor Yellow
 }
-

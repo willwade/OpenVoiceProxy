@@ -2,6 +2,16 @@
 
 A command-line interface for the OpenVoiceProxy TTS server, designed for use with AAC (Augmentative and Alternative Communication) applications.
 
+## Building (Windows, Node SEA)
+
+Run from `electron-server/` on a Windows machine with Node 20+ (SEA is most stable on Node 22+):
+
+```bash
+npm run build:cli
+```
+
+This uses Node's SEA flow to create `dist/CallTTS.exe` (and keeps `CallTTS.bat` alongside for convenience). The exe is also pulled into the Electron installer via `npm run build:all`.
+
 ## Installation
 
 1. Download the CallTTS.exe from the latest OpenVoiceProxy release

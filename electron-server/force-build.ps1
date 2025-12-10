@@ -4,6 +4,14 @@ Write-Host "Force Build with File Unlock" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Ensure we are in electron-server
+$expected = Split-Path -Leaf $PSScriptRoot
+if ($expected -ne "electron-server") {
+    Write-Host "ERROR: Please run this script from the electron-server directory." -ForegroundColor Red
+    Write-Host "Current directory: $PSScriptRoot" -ForegroundColor Red
+    exit 1
+}
+
 # Step 1: Kill any processes that might be locking files
 Write-Host "[1/5] Killing processes that might lock files..." -ForegroundColor Yellow
 
@@ -134,4 +142,3 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "The file may still be locked by another process." -ForegroundColor Yellow
     Write-Host "Try closing ALL applications and running this script again." -ForegroundColor Yellow
 }
-

@@ -112,7 +112,7 @@ Use WebSockets when you want a single, long-lived connection (including `wss` wh
   ```
 - Local `wss` check (self-signed):
   ```bash
-  node generate-cert.js
+  node scripts/generate-cert.js
   npx local-ssl-proxy --source 3443 --target 3000 --key server.key --cert server.crt
   npx wscat -c "wss://localhost:3443/api/ws?api_key=dev" --no-check
   ```

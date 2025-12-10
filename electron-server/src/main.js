@@ -1,8 +1,8 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
-const ProxyServer = require('./proxy-server');
-const logger = require('./logger');
-const { migrateRepoData } = require('./data-path');
+const ProxyServer = require('openvoiceproxy/src/proxy-server');
+const logger = require('openvoiceproxy/src/logger');
+const { migrateRepoData } = require('openvoiceproxy/src/data-path');
 
 class TtsProxyApp {
     constructor() {
