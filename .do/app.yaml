@@ -7,7 +7,7 @@ services:
     branch: main
     deploy_on_push: true
   run_command: npm run start:production
-  build_command: npm install && npm run build:admin
+  build_command: NPM_CONFIG_PRODUCTION=false npm install && npm run build:admin && npm prune --omit=dev
   environment_slug: node-js
   instance_count: 1
   instance_size_slug: basic-xs
