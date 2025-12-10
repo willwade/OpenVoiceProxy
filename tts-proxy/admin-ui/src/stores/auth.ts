@@ -9,6 +9,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const isDevelopmentMode = ref(false)
+  const hasCheckedDevMode = ref(false)
 
   // Getters
   const isAuthenticated = computed(() => !!apiKey.value || isDevelopmentMode.value)
@@ -16,6 +17,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Actions
   async function checkDevelopmentMode(): Promise<boolean> {
+    // Only hit the endpoint once per session; guards that skip auth due to cached API keys
+    // should still run this to populate admin context in LOCAL_MODE/Electron builds.
+    if (hasCheckedDevMode.value) return isDevelopmentMode.value
+
     try {
       const response = await fetch('/admin/api/mode')
       if (response.ok) {
@@ -23,12 +28,14 @@ export const useAuthStore = defineStore('auth', () => {
         if (data.isDevelopmentMode) {
           isDevelopmentMode.value = true
           user.value = { id: 'dev', name: 'Development User', isAdmin: true }
+          hasCheckedDevMode.value = true
           return true
         }
       }
     } catch {
       // Connection error, production mode
     }
+    hasCheckedDevMode.value = true
     return false
   }
 
@@ -94,6 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading,
     error,
     isDevelopmentMode,
+    hasCheckedDevMode,
     // Getters
     isAuthenticated,
     isAdmin,
@@ -106,4 +114,3 @@ export const useAuthStore = defineStore('auth', () => {
     handleSSOCallback,
   }
 })
-

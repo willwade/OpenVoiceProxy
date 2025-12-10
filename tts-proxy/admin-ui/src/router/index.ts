@@ -54,8 +54,8 @@ const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
 
-  // Check dev mode on first navigation
-  if (!authStore.isAuthenticated) {
+  // Always check dev mode once per session so Electron/LOCAL_MODE sets admin context
+  if (!authStore.hasCheckedDevMode) {
     await authStore.checkDevelopmentMode();
   }
 
