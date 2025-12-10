@@ -68,11 +68,12 @@ try {
         throw new Error('Sentinel NODE_SEA not found in node.exe');
     }
 
-    const keepOffset = offsets[offsets.length - 1];
+    // Keep the first occurrence (closest to the header) which matches Node's expected location
+    const keepOffset = offsets[0];
     if (offsets.length > 1) {
-        console.warn(`[SEA] Multiple sentinel occurrences found. Keeping last at offset ${keepOffset}, zeroing others.`);
-        // Zero out earlier occurrences so postject sees only one sentinel
-        for (let i = 0; i < offsets.length - 1; i++) {
+        console.warn(`[SEA] Multiple sentinel occurrences found. Keeping first at offset ${keepOffset}, zeroing others.`);
+        // Zero out later occurrences so postject sees only one sentinel
+        for (let i = 1; i < offsets.length; i++) {
             const off = offsets[i];
             exeBuffer.fill(0, off, off + sentinel.length);
         }
