@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Electron shell for OpenVoiceProxy with Windows packaging (NSIS)",
   "main": "src/main.js",
+  "author": "Will Wade",
   "engines": {
     "node": ">=22"
   },
