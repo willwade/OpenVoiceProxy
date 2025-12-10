@@ -18,6 +18,7 @@ const distDir = path.join(projectRoot, 'dist');
 const blobPath = path.join(distDir, 'calltts.blob');
 const seaConfigPath = path.join(distDir, 'sea-config.json');
 const outputExe = path.join(distDir, 'CallTTS.exe');
+const validationMarker = '[CallTTS CLI ready]';
 
 // Basic SEA config
 const seaConfig = {
@@ -88,3 +89,16 @@ try {
 }
 
 console.log(`[SEA] Done. Output: ${outputExe}`);
+
+// Quick smoke-test: ensure the embedded CLI runs (not raw node.exe)
+console.log('[SEA] Validating CLI entrypoint...');
+const validate = spawnSync(outputExe, ['--help'], { encoding: 'utf8' });
+if (validate.status !== 0) {
+    console.error('[SEA] Validation failed to execute CallTTS.exe', validate.stderr || validate.stdout);
+    process.exit(1);
+}
+if ((validate.stdout || '').includes('Usage: node')) {
+    console.error('[SEA] Validation detected plain node usage output. The blob was not injected correctly.');
+    process.exit(1);
+}
+console.log(validationMarker);
