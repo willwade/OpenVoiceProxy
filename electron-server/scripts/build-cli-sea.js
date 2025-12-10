@@ -50,8 +50,26 @@ fs.copyFileSync(nodeExe, outputExe);
 console.log('[SEA] Injecting blob with postject...');
 try {
     const blobBuffer = fs.readFileSync(blobPath);
+
+    // Find sentinel occurrences to avoid "multiple occurrences" error on Windows Node bins
+    const exeBuffer = fs.readFileSync(outputExe);
+    const sentinel = Buffer.from('NODE_SEA', 'ascii');
+    let offset = exeBuffer.indexOf(sentinel);
+    let next = exeBuffer.indexOf(sentinel, offset + 1);
+    if (next !== -1) {
+        // Use the last occurrence
+        let last = offset;
+        while (next !== -1) {
+            last = next;
+            next = exeBuffer.indexOf(sentinel, last + 1);
+        }
+        offset = last;
+        console.warn(`[SEA] Multiple sentinel occurrences found. Using offset ${offset}.`);
+    }
+
     inject(outputExe, 'NODE_SEA_BLOB', blobBuffer, {
-        sentinelFuse: 'NODE_SEA'
+        sentinelFuse: 'NODE_SEA',
+        sentinelOffset: offset
     });
 } catch (err) {
     console.error('[SEA] postject failed:', err.message || err);
