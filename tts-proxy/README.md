@@ -57,12 +57,6 @@ start-proxy.bat
 test-proxy.bat
 ```
 
-### 3. Configure Voices
-```bash
-# Auto-discover and configure voices:
-configure-voices.bat
-```
-
 ### 4. Simulate Grid3 Workflow
 ```bash
 # Test complete Grid3 integration:
