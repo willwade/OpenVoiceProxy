@@ -116,6 +116,55 @@ class KeyManager {
     }
 
     /**
+     * Export keys (with secrets) for backup/import. Skips environment admin/system defaults.
+     */
+    exportKeys() {
+        return Array.from(this.keys.values()).map(key => ({
+            id: key.id,
+            key: key.key,
+            name: key.name,
+            isAdmin: key.isAdmin,
+            active: key.active,
+            rateLimit: key.rateLimit,
+            expiresAt: key.expiresAt,
+            createdAt: key.createdAt,
+            lastUsed: key.lastUsed,
+            requestCount: key.requestCount
+        }));
+    }
+
+    /**
+     * Import keys (expects structure from exportKeys). Existing IDs are skipped.
+     */
+    async importKeys(importedKeys = []) {
+        let importedCount = 0;
+        for (const k of importedKeys) {
+            // Skip if ID already exists
+            const exists = Array.from(this.keys.values()).some(existing => existing.id === k.id);
+            if (exists) continue;
+
+            const keyData = {
+                id: k.id || crypto.randomUUID(),
+                key: k.key,
+                name: k.name || 'Imported Key',
+                isAdmin: !!k.isAdmin,
+                active: k.active !== false,
+                rateLimit: k.rateLimit || { requests: 100, windowMs: 60000 },
+                expiresAt: k.expiresAt || null,
+                createdAt: k.createdAt || new Date().toISOString(),
+                lastUsed: k.lastUsed || null,
+                requestCount: k.requestCount || 0
+            };
+            this.keys.set(keyData.key, keyData);
+            importedCount++;
+        }
+        if (importedCount > 0) {
+            await this.saveKeys();
+        }
+        return importedCount;
+    }
+
+    /**
      * Update an API key
      */
     async updateKey(keyId, updates) {

@@ -710,10 +710,14 @@ class ProxyServer {
         this.app.use('/admin/api', this.authMiddleware.authenticate({ adminOnly: true }));
         this.app.get('/admin/api/keys', this.adminListKeys.bind(this));
         this.app.post('/admin/api/keys', this.adminCreateKey.bind(this));
+        this.app.get('/admin/api/keys/export', this.adminExportKeys.bind(this));
+        this.app.post('/admin/api/keys/import', this.adminImportKeys.bind(this));
         this.app.put('/admin/api/keys/:keyId', this.adminUpdateKey.bind(this));
         this.app.delete('/admin/api/keys/:keyId', this.adminDeleteKey.bind(this));
         this.app.get('/admin/api/keys/:keyId/engines', this.adminGetEngineConfig.bind(this));
         this.app.put('/admin/api/keys/:keyId/engines', this.adminUpdateEngineConfig.bind(this));
+        this.app.get('/admin/api/keys/:keyId/engines/export', this.adminExportEngineConfig.bind(this));
+        this.app.post('/admin/api/keys/:keyId/engines/import', this.adminImportEngineConfig.bind(this));
         this.app.get('/admin/api/usage', this.adminGetUsage.bind(this));
         this.app.get('/admin/api/engines/status', this.adminGetEnginesStatus.bind(this));
 
@@ -1316,6 +1320,50 @@ class ProxyServer {
         } catch (error) {
             logger.error('Error creating API key:', error);
             res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async adminExportKeys(req, res) {
+        try {
+            const exported = await this.keyManager.exportKeys();
+            res.json({ keys: exported });
+        } catch (error) {
+            logger.error('Error exporting API keys:', error);
+            res.status(400).json({ error: error.message || 'Failed to export keys' });
+        }
+    }
+
+    async adminImportKeys(req, res) {
+        try {
+            const importedKeys = Array.isArray(req.body?.keys) ? req.body.keys : [];
+            const count = await this.keyManager.importKeys(importedKeys);
+            res.json({ message: `Imported ${count} keys` });
+        } catch (error) {
+            logger.error('Error importing API keys:', error);
+            res.status(400).json({ error: error.message || 'Failed to import keys' });
+        }
+    }
+
+    async adminExportEngineConfig(req, res) {
+        try {
+            const { keyId } = req.params;
+            const exported = await this.keyManager.exportEngineConfig(keyId);
+            res.json({ engineConfig: exported });
+        } catch (error) {
+            logger.error('Error exporting engine config:', error);
+            res.status(400).json({ error: error.message || 'Failed to export engine config' });
+        }
+    }
+
+    async adminImportEngineConfig(req, res) {
+        try {
+            const { keyId } = req.params;
+            const importConfig = req.body?.engineConfig || {};
+            await this.keyManager.importEngineConfig(keyId, importConfig);
+            res.json({ message: 'Engine configuration imported' });
+        } catch (error) {
+            logger.error('Error importing engine config:', error);
+            res.status(400).json({ error: error.message || 'Failed to import engine config' });
         }
     }
 

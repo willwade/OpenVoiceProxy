@@ -9,9 +9,11 @@ const keysStore = useKeysStore()
 const newKeyName = ref('')
 const newKeyIsAdmin = ref(false)
 const showCreateForm = ref(false)
+const importInput = ref<HTMLInputElement | null>(null)
 const configModalKeyId = ref<string | null>(null)
 const configModalKeyName = ref('')
 const configModalIsAdmin = ref(false)
+const importStatus = ref<string | null>(null)
 
 async function handleCreateKey() {
   if (!newKeyName.value.trim()) return
@@ -36,6 +38,26 @@ function openEngineConfig(keyId: string, keyName: string, isAdmin: boolean) {
   configModalIsAdmin.value = isAdmin
 }
 
+async function handleExport() {
+  const blob = await keysStore.exportKeys()
+  if (!blob) return
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'api-keys-export.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function handleImport(event: Event) {
+  const files = (event.target as HTMLInputElement).files
+  if (!files || files.length === 0 || !files[0]) return
+  importStatus.value = null
+  const ok = await keysStore.importKeys(files[0] as File)
+  importStatus.value = ok ? 'Import successful' : 'Import failed'
+  if (importInput.value) importInput.value.value = ''
+}
+
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'Never'
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -51,12 +73,30 @@ onMounted(() => keysStore.fetchKeys())
     <div class="space-y-6">
       <div class="flex justify-between items-center">
         <h2 class="text-2xl font-bold text-gray-900">API Keys</h2>
-        <button
-          @click="showCreateForm = !showCreateForm"
-          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-        >
-          {{ showCreateForm ? 'Cancel' : 'Create Key' }}
-        </button>
+        <div class="flex gap-2">
+          <button
+            @click="handleExport"
+            class="px-4 py-2 border border-gray-300 text-gray-800 rounded-lg hover:bg-gray-50"
+          >
+            Export
+          </button>
+          <label class="px-4 py-2 border border-gray-300 text-gray-800 rounded-lg hover:bg-gray-50 cursor-pointer">
+            Import
+            <input
+              ref="importInput"
+              type="file"
+              accept="application/json"
+              class="hidden"
+              @change="handleImport"
+            />
+          </label>
+          <button
+            @click="showCreateForm = !showCreateForm"
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            {{ showCreateForm ? 'Cancel' : 'Create Key' }}
+          </button>
+        </div>
       </div>
 
       <!-- Create Key Form -->
@@ -96,6 +136,10 @@ onMounted(() => keysStore.fetchKeys())
           </button>
         </div>
         <p class="text-sm text-green-700 mt-2">⚠️ Save this key now - it won't be shown again!</p>
+      </div>
+
+      <div v-if="importStatus" class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-800 text-sm">
+        {{ importStatus }}
       </div>
 
       <!-- Keys Table -->
@@ -162,4 +206,3 @@ onMounted(() => keysStore.fetchKeys())
     />
   </AppLayout>
 </template>
-

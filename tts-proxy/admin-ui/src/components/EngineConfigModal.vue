@@ -20,6 +20,8 @@ const engineConfig = ref<Record<string, EngineConfig>>({})
 const isLoading = ref(true)
 const isSaving = ref(false)
 const expandedEngine = ref<string | null>(null)
+const importInput = ref<HTMLInputElement | null>(null)
+const importStatus = ref<string | null>(null)
 
 // Admin users can set custom credentials
 const canSetCredentials = computed(() => authStore.isAdmin)
@@ -82,6 +84,30 @@ async function handleSave() {
     emit('close')
   }
 }
+
+async function handleExport() {
+  const blob = await keysStore.exportEngineConfig(props.keyId)
+  if (!blob) return
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `engine-config-${props.keyName || props.keyId}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function handleImport(event: Event) {
+  const files = (event.target as HTMLInputElement).files
+  if (!files || !files[0]) return
+  importStatus.value = null
+  const ok = await keysStore.importEngineConfig(props.keyId, files[0])
+  importStatus.value = ok ? 'Import successful' : 'Import failed'
+  if (importInput.value) importInput.value.value = ''
+  if (ok) {
+    const config = await keysStore.getEngineConfig(props.keyId)
+    if (config) engineConfig.value = config
+  }
+}
 </script>
 
 <template>
@@ -96,9 +122,31 @@ async function handleSave() {
             {{ canSetCredentials ? 'Enable engines and optionally set custom credentials' : 'Enable or disable available engines' }}
           </p>
         </div>
-        <button @click="emit('close')" class="text-gray-400 hover:text-gray-600 text-2xl">
-          ✕
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            v-if="canSetCredentials"
+            @click="handleExport"
+            class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+          >
+            Export
+          </button>
+          <label
+            v-if="canSetCredentials"
+            class="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 cursor-pointer"
+          >
+            Import
+            <input
+              ref="importInput"
+              type="file"
+              accept="application/json"
+              class="hidden"
+              @change="handleImport"
+            />
+          </label>
+          <button @click="emit('close')" class="text-gray-400 hover:text-gray-600 text-2xl">
+            ✕
+          </button>
+        </div>
       </div>
 
       <div class="p-6 overflow-y-auto max-h-[60vh]">
@@ -215,7 +263,9 @@ async function handleSave() {
           {{ isSaving ? 'Saving...' : 'Save Changes' }}
         </button>
       </div>
+      <div v-if="importStatus" class="px-6 pb-4 text-sm text-blue-700">
+        {{ importStatus }}
+      </div>
     </div>
   </div>
 </template>
-

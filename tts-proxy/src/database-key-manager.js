@@ -195,6 +195,28 @@ class DatabaseKeyManager {
     }
 
     /**
+     * Export keys (only supported in file-based mode)
+     */
+    async exportKeys() {
+        await this.initialize();
+        if (this.useDatabase) {
+            throw new Error('Export not supported when using database-backed keys');
+        }
+        return this.fileKeyManager.exportKeys();
+    }
+
+    /**
+     * Import keys (only supported in file-based mode)
+     */
+    async importKeys(importedKeys) {
+        await this.initialize();
+        if (this.useDatabase) {
+            throw new Error('Import not supported when using database-backed keys');
+        }
+        return this.fileKeyManager.importKeys(importedKeys);
+    }
+
+    /**
      * Update an API key
      */
     async updateKey(keyId, updates) {
@@ -321,6 +343,60 @@ class DatabaseKeyManager {
             // File-based storage doesn't support engine config
             throw new Error('Engine configuration requires database storage');
         }
+    }
+
+    /**
+     * Export custom credentials for a key (only custom creds, not system defaults)
+     */
+    async exportEngineConfig(keyId) {
+        await this.initialize();
+        if (!this.useDatabase) {
+            throw new Error('Engine credential export requires database storage');
+        }
+        const full = await database.getEngineConfig(keyId);
+        if (!full || !full.engineConfig) {
+            return {};
+        }
+        const exported = {};
+        for (const [engineId, cfg] of Object.entries(full.engineConfig)) {
+            if (cfg && cfg.useCustomCredentials && cfg.credentials && Object.keys(cfg.credentials).length) {
+                exported[engineId] = {
+                    useCustomCredentials: true,
+                    credentials: cfg.credentials
+                };
+            }
+        }
+        return exported;
+    }
+
+    /**
+     * Import custom credentials for a key
+     */
+    async importEngineConfig(keyId, importConfig) {
+        await this.initialize();
+        if (!this.useDatabase) {
+            throw new Error('Engine credential import requires database storage');
+        }
+        const full = await database.getEngineConfig(keyId);
+        if (!full) {
+            throw new Error('API key not found');
+        }
+        const engineConfig = full.engineConfig || {};
+        for (const [engineId, cfg] of Object.entries(importConfig || {})) {
+            if (cfg && cfg.credentials && Object.keys(cfg.credentials).length) {
+                engineConfig[engineId] = {
+                    ...(engineConfig[engineId] || {}),
+                    enabled: engineConfig[engineId]?.enabled ?? true,
+                    useCustomCredentials: true,
+                    credentials: cfg.credentials
+                };
+            }
+        }
+        const result = await database.updateEngineConfig(keyId, engineConfig, full.allowedVoices || null);
+        return {
+            engineConfig: result.engine_config,
+            allowedVoices: result.allowed_voices
+        };
     }
 
     /**
