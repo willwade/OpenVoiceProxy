@@ -32,7 +32,7 @@ class SecurityMiddleware {
                 "connect-src 'self'; " +
                 "font-src 'self'; " +
                 "object-src 'none'; " +
-                "media-src 'self'; " +
+                "media-src 'self' blob: data:; " +
                 "frame-src 'none';"
             );
             

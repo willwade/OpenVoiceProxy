@@ -310,10 +310,16 @@ class ESP32Endpoint {
                 try {
                     const engineVoices = await client.getVoices();
                     for (const v of engineVoices) {
+                        const languages = (v.languages && v.languages.length > 0)
+                            ? v.languages
+                            : (v.language ? [v.language] : (v.locale ? [v.locale] : []));
+
                         voices.push({
                             id: v.id,
                             name: v.name,
-                            language: v.language || 'en',
+                            language: v.language || v.locale || 'en',
+                            languages,
+                            locale: v.locale,
                             engine: eng
                         });
                     }
@@ -517,28 +523,54 @@ class ESP32Endpoint {
         try {
             const { engine } = req.query;
             const voices = [];
+            const seen = new Set();
 
             // Get voices from specified engine or all engines
             const engines = engine ? [engine] : Array.from(this.proxyServer.ttsClients.keys());
 
             for (const eng of engines) {
-                if (eng.includes('-mp3')) continue; // Skip duplicate azure-mp3
+                // Skip duplicate variants (mp3/wav)
+                if (eng.includes('-mp3') || eng.includes('-wav')) continue;
                 
                 const client = this.proxyServer.ttsClients.get(eng);
                 if (!client) continue;
 
                 try {
                     const engineVoices = await client.getVoices();
-                    for (const v of engineVoices) {
+                    for (const v of engineVoices || []) {
+                        const languages = (v.languages && v.languages.length > 0)
+                            ? v.languages
+                            : (v.language ? [v.language] : (v.locale ? [v.locale] : []));
+                        const key = `${eng}:${v.id}`;
+                        if (seen.has(key)) continue;
+                        seen.add(key);
                         voices.push({
                             id: v.id,
                             name: v.name,
-                            language: v.language || 'en',
+                            language: v.language || v.locale || 'en',
+                            languages,
+                            locale: v.locale,
                             engine: eng
                         });
                     }
                 } catch (e) {
                     logger.warn(`Failed to get voices from ${eng}: ${e.message}`);
+
+                    // Fallback to pre-mapped voices if available
+                    for (const [mappedId, mapping] of this.proxyServer.voiceMapping.entries()) {
+                        if (mapping.engine !== eng) continue;
+                        const key = `${eng}:${mapping.voiceId || mappedId}`;
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        voices.push({
+                            id: mapping.voiceId || mappedId,
+                            name: mapping.name || mapping.voiceId || mappedId,
+                            language: mapping.language || 'en',
+                            languages: mapping.languages || (mapping.language ? [mapping.language] : []),
+                            locale: mapping.locale,
+                            engine: eng
+                        });
+                    }
                 }
             }
 
