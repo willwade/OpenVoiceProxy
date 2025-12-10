@@ -23,7 +23,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: assets/icon.png
+  icon: assets/icon.ico
   # Completely disable code signing
   signingHashAlgorithms: []
   verifyUpdateCodeSignature: false
