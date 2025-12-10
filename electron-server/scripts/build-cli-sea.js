@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { inject } = require('postject');
 
 if (process.platform !== 'win32') {
     console.error('SEA build must be run on Windows (needs node.exe)');
@@ -47,21 +48,13 @@ const nodeExe = process.execPath; // Windows node.exe
 fs.copyFileSync(nodeExe, outputExe);
 
 console.log('[SEA] Injecting blob with postject...');
-const postjectCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const postjectResult = spawnSync(postjectCmd, [
-    'postject',
-    outputExe,
-    'NODE_SEA_BLOB',
-    blobPath,
-    '--sentinel-fuse',
-    'NODE_SEA'
-], {
-    cwd: projectRoot,
-    stdio: 'inherit'
-});
-
-if (postjectResult.status !== 0) {
-    console.error('[SEA] postject failed');
+try {
+    const blobBuffer = fs.readFileSync(blobPath);
+    inject(outputExe, 'NODE_SEA_BLOB', blobBuffer, {
+        sentinelFuse: 'NODE_SEA'
+    });
+} catch (err) {
+    console.error('[SEA] postject failed:', err.message || err);
     process.exit(1);
 }
 
