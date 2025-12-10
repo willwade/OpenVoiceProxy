@@ -37,6 +37,35 @@ class ESP32Endpoint {
         this.defaultEngine = process.env.ESP32_DEFAULT_ENGINE || 'azure';
         this.defaultVoice = process.env.ESP32_DEFAULT_VOICE || 'en-US-JennyNeural';
         this.defaultSampleRate = parseInt(process.env.ESP32_DEFAULT_SAMPLE_RATE) || 16000;
+        // Cache voices per engine to avoid repeated expensive lookups
+        this.voiceCache = new Map(); // key: engineName, value: { voices, timestamp }
+    }
+
+    deriveLanguages(voice) {
+        // Prefer explicit languages array
+        if (voice.languages && voice.languages.length > 0) {
+            return voice.languages;
+        }
+
+        const candidateCodes = [];
+
+        if (voice.language) candidateCodes.push(voice.language);
+        if (voice.locale) candidateCodes.push(voice.locale);
+
+        // Parse from Azure-style ID, e.g., ar-SA-HamedNeural -> ar-SA
+        if (voice.id) {
+            const match = voice.id.match(/^([a-z]{2,3}(?:-[A-Z]{2})?)/i);
+            if (match && match[1]) {
+                candidateCodes.push(match[1]);
+            }
+        }
+
+        // Normalize and de-dupe
+        const normalized = Array.from(new Set(candidateCodes
+            .filter(Boolean)
+            .map((c) => c.replace('_', '-'))));
+
+        return normalized;
     }
 
     /**
@@ -536,18 +565,25 @@ class ESP32Endpoint {
                 if (!client) continue;
 
                 try {
-                    const engineVoices = await client.getVoices();
+                    let engineVoices = [];
+
+                    // Serve from cache if available
+                    if (this.voiceCache.has(eng)) {
+                        engineVoices = this.voiceCache.get(eng).voices || [];
+                    } else {
+                        engineVoices = await client.getVoices();
+                        this.voiceCache.set(eng, { voices: engineVoices, timestamp: Date.now() });
+                    }
+
                     for (const v of engineVoices || []) {
-                        const languages = (v.languages && v.languages.length > 0)
-                            ? v.languages
-                            : (v.language ? [v.language] : (v.locale ? [v.locale] : []));
+                        const languages = this.deriveLanguages(v);
                         const key = `${eng}:${v.id}`;
                         if (seen.has(key)) continue;
                         seen.add(key);
                         voices.push({
                             id: v.id,
                             name: v.name,
-                            language: v.language || v.locale || 'en',
+                            language: languages[0] || v.language || v.locale || 'en',
                             languages,
                             locale: v.locale,
                             engine: eng
@@ -562,11 +598,12 @@ class ESP32Endpoint {
                         const key = `${eng}:${mapping.voiceId || mappedId}`;
                         if (seen.has(key)) continue;
                         seen.add(key);
+                        const languages = this.deriveLanguages(mapping);
                         voices.push({
                             id: mapping.voiceId || mappedId,
                             name: mapping.name || mapping.voiceId || mappedId,
-                            language: mapping.language || 'en',
-                            languages: mapping.languages || (mapping.language ? [mapping.language] : []),
+                            language: languages[0] || mapping.language || 'en',
+                            languages: languages.length > 0 ? languages : (mapping.languages || []),
                             locale: mapping.locale,
                             engine: eng
                         });

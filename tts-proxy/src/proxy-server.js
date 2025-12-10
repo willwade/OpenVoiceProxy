@@ -24,6 +24,7 @@ class ProxyServer {
         this.app = express();
         this.server = null;
         this.isRunning = false;
+        this.engineStatusCache = { data: null, timestamp: 0 };
 
         // Load environment variables first
         this.envLoader = new EnvironmentLoader();
@@ -1412,6 +1413,12 @@ class ProxyServer {
 
     async adminGetEnginesStatus(req, res) {
         try {
+            // Cache engine status for 60 seconds to avoid repeated heavy checks
+            const now = Date.now();
+            if (this.engineStatusCache.data && now - this.engineStatusCache.timestamp < 60_000) {
+                return res.json(this.engineStatusCache.data);
+            }
+
             const engineStatuses = {};
 
             // Check each TTS client's credential status and get voice count
@@ -1475,6 +1482,14 @@ class ProxyServer {
                 engines: engineStatuses,
                 timestamp: new Date().toISOString()
             });
+
+            this.engineStatusCache = {
+                data: {
+                    engines: engineStatuses,
+                    timestamp: new Date().toISOString()
+                },
+                timestamp: now
+            };
         } catch (error) {
             logger.error('Error getting engine status:', error);
             res.status(500).json({ error: 'Internal server error' });

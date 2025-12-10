@@ -17,6 +17,7 @@ const allVoices = ref<
         language?: string;
         locale?: string;
         languages?: string[];
+        languageNames?: string[];
         engine: string;
         gender?: string;
         type?: string;
@@ -36,26 +37,55 @@ const stats = computed(() => ({
 }));
 
 const filteredVoices = computed(() => {
-        const term = searchLang.value.trim().toLowerCase();
-        if (!term) return allVoices.value;
+    const term = searchLang.value.trim().toLowerCase();
+    if (!term) return allVoices.value;
 
-        return allVoices.value.filter((v) => {
-            const langs = [
-                ...(v.languages || []),
-                ...(v.language ? [v.language] : []),
-                ...(v.locale ? [v.locale] : []),
-            ]
-                .filter(Boolean)
-                .map((l) => l.toLowerCase());
+    return allVoices.value.filter((v) => {
+        const codes = [
+            ...(v.languages || []),
+            ...(v.language ? [v.language] : []),
+            ...(v.locale ? [v.locale] : []),
+        ]
+            .filter(Boolean)
+            .map((l) => l.toLowerCase());
 
-            const name = v.name?.toLowerCase() || "";
-            return (
-            langs.some((l) => l.includes(term)) ||
+        const names = (v.languageNames || []).map((n) => n.toLowerCase());
+
+        const name = v.name?.toLowerCase() || "";
+        return (
+            codes.some((l) => l.includes(term)) ||
+            names.some((n) => n.includes(term)) ||
             name.includes(term) ||
             v.engine.toLowerCase().includes(term)
         );
     });
 });
+
+function toLanguageNames(codes: string[]): string[] {
+    let display: Intl.DisplayNames | null = null;
+    try {
+        display = new Intl.DisplayNames(["en"], { type: "language" });
+    } catch {
+        display = null;
+    }
+
+    const names: string[] = [];
+    codes.forEach((code) => {
+        const lower = code.toLowerCase();
+        let name;
+        if (display) {
+            try {
+                name = display.of(code) || display.of(lower) || undefined;
+            } catch {
+                name = undefined;
+            }
+        }
+        if (name) {
+            names.push(name);
+        }
+    });
+    return Array.from(new Set(names));
+}
 
 async function loadVoicesAcrossEngines() {
     isLoadingVoices.value = true;
@@ -73,12 +103,26 @@ async function loadVoicesAcrossEngines() {
                 throw new Error(`Engine ${engine} responded ${res.status}`);
             }
             const data = await res.json();
-            (data.voices || []).forEach((v: any) =>
+            (data.voices || []).forEach((v: any) => {
+                const codesRaw = [
+                    ...(v.languages || []),
+                    ...(v.language ? [v.language] : []),
+                    ...(v.locale ? [v.locale] : []),
+                ].filter(Boolean);
+
+                // Add base language (before region) to improve matching, e.g., "ar" from "ar-SA"
+                const baseCodes = codesRaw
+                    .map((c: string) => c.split(/[-_]/)[0])
+                    .filter(Boolean);
+
+                const codes = Array.from(new Set([...codesRaw, ...baseCodes]));
+
                 voices.push({
                     ...v,
                     engine,
-                }),
-            );
+                    languageNames: toLanguageNames(codes),
+                });
+            });
         } catch (error: any) {
             console.error("Error loading voices for engine", engine, error);
             voicesError.value =
@@ -242,11 +286,22 @@ onMounted(async () => {
                                 </span>
                             </div>
                             <div class="text-sm text-gray-700 mt-1">
-                                {{
-                                    voice.languages && voice.languages.length
-                                        ? voice.languages.join(", ")
-                                        : voice.language || voice.locale || "Unknown language"
-                                }}
+                                <div class="text-xs text-gray-600">
+                                    Codes:
+                                    {{
+                                        voice.languages && voice.languages.length
+                                            ? voice.languages.join(", ")
+                                            : voice.language || voice.locale || "Unknown"
+                                    }}
+                                </div>
+                                <div class="text-xs text-gray-800">
+                                    Names:
+                                    {{
+                                        voice.languageNames && voice.languageNames.length
+                                            ? voice.languageNames.join(", ")
+                                            : "Unknown language"
+                                    }}
+                                </div>
                             </div>
                             <div class="text-xs text-gray-500 mt-1">
                                 {{ voice.gender ? voice.gender + " • " : "" }}{{ voice.type || "" }}
