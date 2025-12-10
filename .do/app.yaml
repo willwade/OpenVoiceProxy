@@ -64,6 +64,9 @@ services:
   - key: DATABASE_URL
     scope: RUN_TIME
     value: ${openvoiceproxy-db.DATABASE_URL}
+  - key: VITE_ENABLE_CLI_CONFIG
+    scope: BUILD_TIME
+    value: "false"
   routes:
   - path: /
 databases:
