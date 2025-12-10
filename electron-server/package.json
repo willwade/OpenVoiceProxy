@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Electron shell for OpenVoiceProxy with Windows packaging (NSIS)",
   "main": "src/main.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",

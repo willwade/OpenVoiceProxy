@@ -22,6 +22,8 @@ services:
   envs:
   - key: NODE_ENV
     value: production
+  - key: NODE_VERSION
+    value: "22"
   - key: PORT
     value: "3000"
   - key: LOG_LEVEL

@@ -19,7 +19,7 @@ A secure, cloud-ready proxy server that intercepts ElevenLabs API calls and redi
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v16 or later)
+- [Node.js](https://nodejs.org/) (v22 recommended; repo has `.nvmrc`)
 - [Git](https://git-scm.com/)
 - At least one TTS service API key (optional for basic testing)
 
