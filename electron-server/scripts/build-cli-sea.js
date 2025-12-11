@@ -68,17 +68,8 @@ try {
         throw new Error('Sentinel NODE_SEA not found in node.exe');
     }
 
-    // Keep the first occurrence (closest to the header) which matches Node's expected location
-    const keepOffset = offsets[0];
-    if (offsets.length > 1) {
-        console.warn(`[SEA] Multiple sentinel occurrences found. Keeping first at offset ${keepOffset}, zeroing others.`);
-        // Zero out later occurrences so postject sees only one sentinel
-        for (let i = 1; i < offsets.length; i++) {
-            const off = offsets[i];
-            exeBuffer.fill(0, off, off + sentinel.length);
-        }
-        fs.writeFileSync(outputExe, exeBuffer);
-    }
+    console.log(`[SEA] Found ${offsets.length} sentinel occurrence(s): ${offsets.join(', ')}`);
+    const keepOffset = offsets[0]; // first occurrence is the supported fuse
 
     inject(outputExe, 'NODE_SEA_BLOB', blobBuffer, {
         sentinelFuse: 'NODE_SEA',
