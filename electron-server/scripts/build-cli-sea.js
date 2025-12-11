@@ -50,6 +50,27 @@ console.log('[SEA] Preparing executable...');
 const nodeExe = process.execPath; // Windows node.exe
 const originalExeBuffer = fs.readFileSync(nodeExe);
 
+// Remove Authenticode signature if signtool is available (recommended by Node SEA docs)
+try {
+    const signtool = spawnSync('signtool', ['/?' ], { stdio: 'ignore' });
+    if (signtool.status === 0) {
+        console.log('[SEA] Stripping Authenticode signature with signtool (if present)...');
+        const remove = spawnSync('signtool', ['remove', '/s', nodeExe], { stdio: 'inherit' });
+        if (remove.status !== 0) {
+            console.warn('[SEA] signtool remove failed (continuing with unsigned copy).');
+        } else {
+            // Reload the unsigned exe buffer
+            console.log('[SEA] Signature removal succeeded, reloading node.exe bytes...');
+            const unsigned = fs.readFileSync(nodeExe);
+            originalExeBuffer.set(unsigned);
+        }
+    } else {
+        console.log('[SEA] signtool not available; continuing without signature stripping.');
+    }
+} catch (err) {
+    console.log('[SEA] signtool check failed; continuing without signature stripping.', err.message || err);
+}
+
 console.log('[SEA] Injecting blob with postject (trying all sentinel offsets)...');
 let injected = false;
 let lastError = null;
