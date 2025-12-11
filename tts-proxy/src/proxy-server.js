@@ -14,6 +14,7 @@ const TranslationService = require('./translation-service');
 const pcmConvert = require('pcm-convert');
 const ESP32Endpoint = require('./esp32-endpoint');
 const WebSocket = require('ws');
+const { getCliConfigPath } = require('./cli-config-path');
 
 // Debug audio playback imports (loaded when needed)
 let Speaker, wav;
@@ -47,6 +48,8 @@ class ProxyServer {
 
         // Initialize translation service
         this.translationService = new TranslationService();
+        this.isLocalMode = process.env.LOCAL_MODE === 'true' || (process.versions && process.versions.electron);
+        this.cliConfigPath = getCliConfigPath();
 
         // Log development mode status
         if (this.authMiddleware.isDevelopmentMode()) {
@@ -720,6 +723,8 @@ class ProxyServer {
         this.app.post('/admin/api/keys/:keyId/engines/import', this.adminImportEngineConfig.bind(this));
         this.app.get('/admin/api/usage', this.adminGetUsage.bind(this));
         this.app.get('/admin/api/engines/status', this.adminGetEnginesStatus.bind(this));
+        // Local/Electron-only: save CLI config to default userData path
+        this.app.post('/admin/api/cli-config/save', this.adminSaveCliConfig.bind(this));
 
         // Settings routes for system credentials
         this.app.get('/admin/api/settings/credentials', this.adminGetCredentials.bind(this));
@@ -889,6 +894,39 @@ class ProxyServer {
         } catch (error) {
             logger.error('Error getting voices:', error);
             res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    /**
+     * Save CLI config.json to the default CallTTS user data directory.
+     * Only allowed in LOCAL/Electron mode.
+     */
+    async adminSaveCliConfig(req, res) {
+        if (!this.isLocalMode) {
+            return res.status(403).json({ error: 'CLI config save is only available in local/Electron mode' });
+        }
+
+        const config = req.body?.config;
+        if (!config || typeof config !== 'object') {
+            return res.status(400).json({ error: 'config (object) is required' });
+        }
+
+        try {
+            const fs = require('fs');
+            const path = require('path');
+
+            const targetPath = this.cliConfigPath;
+            const dir = path.dirname(targetPath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+
+            fs.writeFileSync(targetPath, JSON.stringify(config, null, 2), 'utf8');
+            logger.info(`Saved CLI config to ${targetPath}`);
+            res.json({ message: 'CLI config saved', path: targetPath });
+        } catch (error) {
+            logger.error('Error saving CLI config:', error);
+            res.status(500).json({ error: 'Failed to save CLI config' });
         }
     }
 

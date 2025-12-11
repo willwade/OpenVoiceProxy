@@ -44,6 +44,8 @@ const testResult = ref<{
     message: string;
     audioUrl?: string;
 } | null>(null);
+const isSavingLocal = ref<boolean>(false);
+const saveStatus = ref<string | null>(null);
 const voices = ref<
     Array<{
         id: string;
@@ -430,6 +432,30 @@ function downloadConfig() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+async function saveToDefaultPath() {
+    saveStatus.value = null;
+    isSavingLocal.value = true;
+    try {
+        const parsed = JSON.parse(configJson.value);
+        const response = await axios.post(
+            "/admin/api/cli-config/save",
+            { config: parsed },
+            { headers: authStore.getHeaders(true) },
+        );
+        saveStatus.value = `Saved to ${response.data?.path || "default user data path"}`;
+        alert("Saved to default user data directory for CallTTS");
+    } catch (error: any) {
+        const message =
+            error?.response?.data?.error ||
+            error?.message ||
+            "Failed to save CLI config";
+        console.error("Error saving CLI config:", message);
+        saveStatus.value = `Error: ${message}`;
+    } finally {
+        isSavingLocal.value = false;
+    }
 }
 
 function playTestAudio() {
@@ -1126,7 +1152,7 @@ onMounted(async () => {
                         class="bg-gray-100 p-4 rounded-md overflow-x-auto text-sm"
                         >{{ configJson }}</pre
                     >
-                    <div class="flex mt-4 space-x-2">
+                    <div class="flex mt-4 space-x-2 flex-wrap gap-2">
                         <button
                             @click="copyToClipboard"
                             class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors"
@@ -1139,7 +1165,17 @@ onMounted(async () => {
                         >
                             💾 Download config.json
                         </button>
+                        <button
+                            @click="saveToDefaultPath"
+                            :disabled="isSavingLocal"
+                            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50"
+                        >
+                            {{ isSavingLocal ? "Saving..." : "Save to CLI default path" }}
+                        </button>
                     </div>
+                    <p v-if="saveStatus" class="mt-2 text-sm text-gray-700">
+                        {{ saveStatus }}
+                    </p>
                 </div>
             </div>
 
