@@ -20,6 +20,7 @@ const seaConfigPath = path.join(distDir, 'sea-config.json');
 const outputExe = path.join(distDir, 'CallTTS.exe');
 const tempExe = path.join(distDir, 'CallTTS.tmp.exe');
 const validationMarker = '[CallTTS CLI ready]';
+const staticSentinels = ['NODE_SEA']; // fallback; dynamic fuse strings will be detected from node.exe
 
 // Basic SEA config
 const seaConfig = {
@@ -55,56 +56,94 @@ let lastError = null;
 try {
     const blobBuffer = fs.readFileSync(blobPath);
 
-    // Find sentinel occurrences to avoid "multiple occurrences" error on Windows Node bins
-    const exeBuffer = Buffer.from(originalExeBuffer);
-    const sentinel = Buffer.from('NODE_SEA', 'ascii');
-    let offsets = [];
-    let search = 0;
+    const exeBufferFull = Buffer.from(originalExeBuffer);
+
+    // Discover fuse strings baked into node.exe (e.g., NODE_SEA_FUSE_<hash>)
+    const dynamicSentinels = [];
+    let searchFuse = 0;
+    const fusePrefix = 'NODE_SEA_FUSE';
+    const fusePrefixBuf = Buffer.from(fusePrefix, 'ascii');
     while (true) {
-        const idx = exeBuffer.indexOf(sentinel, search);
+        const idx = exeBufferFull.indexOf(fusePrefixBuf, searchFuse);
         if (idx === -1) break;
-        offsets.push(idx);
-        search = idx + sentinel.length;
+        // Extract the full ascii word starting at idx (letters, digits, underscore)
+        let end = idx + fusePrefix.length;
+        while (end < exeBufferFull.length) {
+            const ch = exeBufferFull[end];
+            if (
+                (ch >= 48 && ch <= 57) || // 0-9
+                (ch >= 65 && ch <= 90) || // A-Z
+                (ch >= 97 && ch <= 122) || // a-z
+                ch === 95 // _
+            ) {
+                end++;
+            } else {
+                break;
+            }
+        }
+        const sentinelStr = exeBufferFull.toString('ascii', idx, end);
+        if (!dynamicSentinels.includes(sentinelStr)) {
+            dynamicSentinels.push(sentinelStr);
+        }
+        searchFuse = end;
     }
 
-    if (offsets.length === 0) {
-        throw new Error('Sentinel NODE_SEA not found in node.exe');
-    }
+    const sentinelCandidates = [...dynamicSentinels, ...staticSentinels];
+    console.log(`[SEA] Sentinel candidates: ${sentinelCandidates.join(', ') || 'none found'}`);
 
-    console.log(`[SEA] Found ${offsets.length} sentinel occurrence(s): ${offsets.join(', ')}`);
+    for (const sentinelName of sentinelCandidates) {
+        const exeBuffer = Buffer.from(originalExeBuffer);
+        const sentinel = Buffer.from(sentinelName, 'ascii');
+        let offsets = [];
+        let search = 0;
+        while (true) {
+            const idx = exeBuffer.indexOf(sentinel, search);
+            if (idx === -1) break;
+            offsets.push(idx);
+            search = idx + sentinel.length;
+        }
 
-    for (const offset of offsets) {
-        console.log(`[SEA] Trying sentinel offset ${offset}...`);
-        fs.writeFileSync(tempExe, originalExeBuffer);
-
-        try {
-            inject(tempExe, 'NODE_SEA_BLOB', blobBuffer, {
-                sentinelFuse: 'NODE_SEA',
-                sentinelOffset: offset
-            });
-        } catch (err) {
-            lastError = err;
-            console.warn(`[SEA] Injection failed at offset ${offset}: ${err.message || err}`);
+        if (offsets.length === 0) {
+            console.warn(`[SEA] Sentinel ${sentinelName} not found in node.exe, skipping.`);
             continue;
         }
 
-        // Quick smoke-test: ensure the embedded CLI runs (not raw node.exe)
-        const validate = spawnSync(tempExe, ['--help'], { encoding: 'utf8' });
-        if (validate.status !== 0) {
-            console.warn(`[SEA] Validation failed at offset ${offset}:`, validate.stderr || validate.stdout);
-            lastError = new Error(`Validation failed at offset ${offset}`);
-            continue;
-        }
-        if ((validate.stdout || '').includes('Usage: node')) {
-            console.warn(`[SEA] Offset ${offset} produced plain Node help. Trying next offset...`);
-            lastError = new Error(`Plain node help at offset ${offset}`);
-            continue;
+        console.log(`[SEA] Found ${offsets.length} sentinel occurrence(s) for ${sentinelName}: ${offsets.join(', ')}`);
+
+        for (const offset of offsets) {
+            console.log(`[SEA] Trying sentinel ${sentinelName} at offset ${offset}...`);
+            fs.writeFileSync(tempExe, originalExeBuffer);
+
+            try {
+                inject(tempExe, 'NODE_SEA_BLOB', blobBuffer, {
+                    sentinelFuse: sentinelName,
+                    sentinelOffset: offset
+                });
+            } catch (err) {
+                lastError = err;
+                console.warn(`[SEA] Injection failed at offset ${offset} for ${sentinelName}: ${err.message || err}`);
+                continue;
+            }
+
+            const validate = spawnSync(tempExe, ['--help'], { encoding: 'utf8' });
+            if (validate.status !== 0) {
+                console.warn(`[SEA] Validation failed at offset ${offset} for ${sentinelName}:`, validate.stderr || validate.stdout);
+                lastError = new Error(`Validation failed at offset ${offset} for ${sentinelName}`);
+                continue;
+            }
+            if ((validate.stdout || '').includes('Usage: node')) {
+                console.warn(`[SEA] Offset ${offset} for ${sentinelName} produced plain Node help. Trying next...`);
+                lastError = new Error(`Plain node help at offset ${offset} for ${sentinelName}`);
+                continue;
+            }
+
+            fs.copyFileSync(tempExe, outputExe);
+            injected = true;
+            console.log(`[SEA] Injection and validation succeeded at offset ${offset} using ${sentinelName}`);
+            break;
         }
 
-        fs.copyFileSync(tempExe, outputExe);
-        injected = true;
-        console.log(`[SEA] Injection and validation succeeded at offset ${offset}`);
-        break;
+        if (injected) break;
     }
 } catch (err) {
     lastError = err;
