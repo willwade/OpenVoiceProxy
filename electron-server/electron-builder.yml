@@ -15,6 +15,9 @@ extraResources:
     to: cli/CallTTS.bat
   - from: cli/README.md
     to: cli/README.md
+extraFiles:
+  - from: dist/CallTTS.exe
+    to: CallTTS.exe
 # Only build for Windows (no macOS)
 mac:
   target: []

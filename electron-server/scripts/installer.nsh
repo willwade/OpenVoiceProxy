@@ -28,6 +28,7 @@
   ; Create shortcuts in user's start menu
   CreateDirectory "$SMPROGRAMS\OpenVoiceProxy"
   CreateShortCut "$SMPROGRAMS\OpenVoiceProxy\OpenVoiceProxy.lnk" "$INSTDIR\OpenVoiceProxy.exe" "" "$INSTDIR\OpenVoiceProxy.exe" 0
+  CreateShortCut "$SMPROGRAMS\OpenVoiceProxy\CallTTS.lnk" "$INSTDIR\CallTTS.exe" "" "$INSTDIR\CallTTS.exe" 0
   CreateShortCut "$SMPROGRAMS\OpenVoiceProxy\Admin Interface.lnk" "http://localhost:3000/admin/" "" "$INSTDIR\OpenVoiceProxy.exe" 0
   CreateShortCut "$SMPROGRAMS\OpenVoiceProxy\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
   ; Ensure user data directory exists and create default empty data files

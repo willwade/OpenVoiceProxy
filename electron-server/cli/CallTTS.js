@@ -5,6 +5,10 @@ const fs = require("fs");
 const path = require("path");
 const { spawn, execSync } = require("child_process");
 const { program } = require("commander");
+const os = require("os");
+
+const APP_NAME = "OpenVoiceProxy";
+const CLI_NAME = "CallTTS";
 
 // Default configuration
 const defaultConfig = {
@@ -41,6 +45,27 @@ const defaultConfig = {
   },
 };
 
+function cloneDefaultConfig() {
+  return JSON.parse(JSON.stringify(defaultConfig));
+}
+
+function getUserDataDir() {
+  if (process.platform === "win32") {
+    return process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+  }
+  if (process.platform === "darwin") {
+    return path.join(os.homedir(), "Library", "Application Support");
+  }
+  return process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+}
+
+const defaultConfigPath = path.join(
+  getUserDataDir(),
+  APP_NAME,
+  CLI_NAME,
+  "config.json",
+);
+
 // Parse command line arguments
 program
   .name("CallTTS")
@@ -49,7 +74,11 @@ program
 
 program
   .option("-t, --text <text>", "Text to convert to speech (uses clipboard if not provided)")
-  .option("-c, --config <path>", "Path to configuration file", "config.json")
+  .option(
+    "-c, --config <path>",
+    "Path to configuration file",
+    defaultConfigPath,
+  )
   .option("-o, --output <path>", "Output file path for audio")
   .option("--server <url>", "WebSocket server URL", defaultConfig.server.url)
   .option(
@@ -181,17 +210,31 @@ async function main(options) {
 
 // Load configuration from file
 function loadConfig(configPath) {
+  const resolvedPath = path.resolve(configPath);
+
+  // Ensure default location exists and is initialized the first time
+  if (resolvedPath === path.resolve(defaultConfigPath)) {
+    const configDir = path.dirname(resolvedPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    if (!fs.existsSync(resolvedPath)) {
+      fs.writeFileSync(resolvedPath, JSON.stringify(defaultConfig, null, 2));
+      return cloneDefaultConfig();
+    }
+  }
+
   try {
-    if (fs.existsSync(configPath)) {
-      const fileConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      return mergeDeep(defaultConfig, fileConfig);
+    if (fs.existsSync(resolvedPath)) {
+      const fileConfig = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+      return mergeDeep(cloneDefaultConfig(), fileConfig);
     } else {
-      console.warn(`Config file ${configPath} not found, using defaults`);
-      return defaultConfig;
+      console.warn(`Config file ${resolvedPath} not found, using defaults`);
+      return cloneDefaultConfig();
     }
   } catch (error) {
     console.error(`Error loading config file: ${error.message}`);
-    return defaultConfig;
+    return cloneDefaultConfig();
   }
 }
 
