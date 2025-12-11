@@ -12,9 +12,8 @@
     "dev": "electron . --dev",
     "build": "electron-builder --win",
     "build:nsis": "electron-builder --win nsis",
-    "build:cli": "node scripts/build-cli-sea.js",
-    "build:all": "npm --prefix ../tts-proxy run build && npm run build:cli && npm run build",
-    "postinstall": "patch-package"
+    "build:cli": "npx nexe ./cli/CallTTS.js -o dist/CallTTS.exe -t windows-x64-22.12.0 --verbose",
+    "build:all": "npm --prefix ../tts-proxy run build && npm run build:cli && npm run build"
   },
   "dependencies": {
     "commander": "^12.1.0",
@@ -24,7 +23,6 @@
   "devDependencies": {
     "electron": "^28.0.0",
     "electron-builder": "^24.13.3",
-    "patch-package": "^8.0.0",
-    "postject": "^1.0.0-alpha.6"
+    "nexe": "^4.0.0-beta.23"
   }
 }
