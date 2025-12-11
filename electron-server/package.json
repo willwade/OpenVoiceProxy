@@ -12,7 +12,7 @@
     "dev": "electron . --dev",
     "build": "electron-builder --win",
     "build:nsis": "electron-builder --win nsis",
-    "build:cli": "npx nexe ./cli/CallTTS.js -o dist/CallTTS.exe -t windows-x64-22.12.0 --verbose",
+    "build:cli": "npx nexe ./cli/CallTTS.js -o dist/CallTTS.exe -t windows-x64-20.17.0 --verbose --build --vcBuild nosign --vcBuild release --vcBuild openssl-no-asm",
     "build:all": "npm --prefix ../tts-proxy run build && npm run build:cli && npm run build"
   },
   "dependencies": {
@@ -23,6 +23,6 @@
   "devDependencies": {
     "electron": "^28.0.0",
     "electron-builder": "^24.13.3",
-    "nexe": "^4.0.0-beta.23"
+    "nexe": "^5.0.0-beta.4"
   }
 }
