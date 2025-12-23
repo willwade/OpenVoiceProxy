@@ -133,20 +133,7 @@
         .button.secondary:hover {
             background: #7f8c8d;
         }
-        
-        .voice-mapping {
-            border: 1px solid #bdc3c7;
-            border-radius: 4px;
-            padding: 15px;
-            margin-bottom: 10px;
-            background: #f8f9fa;
-        }
-        
-        .voice-mapping h4 {
-            margin: 0 0 10px 0;
-            color: #2c3e50;
-        }
-        
+
         .logs {
             background: #2c3e50;
             color: #ecf0f1;
@@ -169,7 +156,6 @@
         <div class="tabs">
             <button class="tab active" onclick="showTab('status')">Status</button>
             <button class="tab" onclick="showTab('network')">Network</button>
-            <button class="tab" onclick="showTab('voices')">Voice Mapping</button>
             <button class="tab" onclick="showTab('logs')">Logs</button>
         </div>
         
@@ -181,12 +167,21 @@
                 <p><strong>Status:</strong> Active</p>
                 <p><strong>Uptime:</strong> <span id="uptime">--</span></p>
             </div>
-            
+
+            <div class="status-section" style="background: #e3f2fd; border-color: #2196f3;">
+                <h4>🔧 Quick Configuration Links</h4>
+                <p>Configure TTS engines and API keys in the Admin Portal:</p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                    <button class="button" onclick="openAdminPortal()">Open Admin Portal</button>
+                    <button class="button secondary" onclick="openCliConfig()">Open CLI Config Generator</button>
+                </div>
+            </div>
+
             <div class="form-group">
                 <button class="button" onclick="testProxy()">Test Proxy</button>
                 <button class="button secondary" onclick="restartProxy()">Restart Proxy</button>
             </div>
-            
+
             <div id="test-results" style="margin-top: 20px;"></div>
         </div>
         
@@ -213,52 +208,6 @@
             </div>
         </div>
         
-        <div id="voices" class="tab-content">
-            <h2>Voice Mapping</h2>
-            <p>Map ElevenLabs voice IDs to local TTS voices:</p>
-            
-            <div class="voice-mapping">
-                <h4>Local Voice 1</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>
-                        <label>ElevenLabs Voice ID:</label>
-                        <input type="text" value="local-voice-1" readonly>
-                    </div>
-                    <div>
-                        <label>Local Voice:</label>
-                        <select>
-                            <option>Microsoft David Desktop</option>
-                            <option>Microsoft Zira Desktop</option>
-                            <option>Microsoft Mark Desktop</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="voice-mapping">
-                <h4>Local Voice 2</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>
-                        <label>ElevenLabs Voice ID:</label>
-                        <input type="text" value="local-voice-2" readonly>
-                    </div>
-                    <div>
-                        <label>Local Voice:</label>
-                        <select>
-                            <option>Microsoft David Desktop</option>
-                            <option selected>Microsoft Zira Desktop</option>
-                            <option>Microsoft Mark Desktop</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <button class="button" onclick="addVoiceMapping()">Add Voice Mapping</button>
-                <button class="button" onclick="saveVoiceMappings()">Save Mappings</button>
-            </div>
-        </div>
-        
         <div id="logs" class="tab-content">
             <h2>Application Logs</h2>
             <div class="logs" id="log-content">
@@ -275,26 +224,36 @@
     </div>
 
     <script>
+        const { shell } = require('electron');
+
         function showTab(tabName) {
             // Hide all tab contents
             const contents = document.querySelectorAll('.tab-content');
             contents.forEach(content => content.classList.remove('active'));
-            
+
             // Remove active class from all tabs
             const tabs = document.querySelectorAll('.tab');
             tabs.forEach(tab => tab.classList.remove('active'));
-            
+
             // Show selected tab content
             document.getElementById(tabName).classList.add('active');
-            
+
             // Add active class to clicked tab
             event.target.classList.add('active');
         }
-        
+
+        function openAdminPortal() {
+            shell.openExternal('http://localhost:3000/admin/');
+        }
+
+        function openCliConfig() {
+            shell.openExternal('http://localhost:3000/admin/cli-config');
+        }
+
         function testProxy() {
             const resultsDiv = document.getElementById('test-results');
             resultsDiv.innerHTML = '<p>🔄 Testing proxy endpoints...</p>';
-            
+
             // This would normally make actual HTTP requests to test the proxy
             // For now, we'll simulate the test
             setTimeout(() => {
@@ -309,27 +268,19 @@
                 `;
             }, 2000);
         }
-        
+
         function restartProxy() {
             alert('Proxy restart functionality will be implemented');
         }
-        
+
         function saveNetworkSettings() {
             alert('Network settings saved (placeholder)');
         }
-        
-        function addVoiceMapping() {
-            alert('Add voice mapping functionality will be implemented');
-        }
-        
-        function saveVoiceMappings() {
-            alert('Voice mappings saved (placeholder)');
-        }
-        
+
         function clearLogs() {
             document.getElementById('log-content').innerHTML = '';
         }
-        
+
         function refreshLogs() {
             // This would normally fetch real logs
             const logContent = document.getElementById('log-content');
@@ -337,7 +288,7 @@
             logContent.innerHTML += `[${timestamp}] INFO: Logs refreshed<br>`;
             logContent.scrollTop = logContent.scrollHeight;
         }
-        
+
         // Update uptime every second
         let startTime = Date.now();
         setInterval(() => {
@@ -345,7 +296,7 @@
             const hours = Math.floor(uptime / 3600);
             const minutes = Math.floor((uptime % 3600) / 60);
             const seconds = uptime % 60;
-            document.getElementById('uptime').textContent = 
+            document.getElementById('uptime').textContent =
                 `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }, 1000);
     </script>

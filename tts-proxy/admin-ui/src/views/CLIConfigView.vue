@@ -555,11 +555,25 @@ onMounted(async () => {
     <AppLayout>
         <div class="space-y-6">
             <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-gray-900">
-                    CLI Configuration Generator
-                </h2>
-                <div class="text-sm text-gray-600">
-                    Create configuration files for CallTTS.exe
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">
+                        CLI Configuration Generator
+                    </h2>
+                    <div class="text-sm text-gray-600 mt-1">
+                        Create configuration files for CallTTS.exe
+                    </div>
+                </div>
+                <div
+                    v-if="!availableEngines.length"
+                    class="text-sm text-orange-600 bg-orange-50 px-4 py-2 rounded-md"
+                >
+                    <strong>No TTS engines configured!</strong>
+                    <a
+                        href="/admin/keys"
+                        class="underline hover:text-orange-800 ml-1"
+                    >
+                        Go to API Keys to configure engines
+                    </a>
                 </div>
             </div>
 
@@ -594,6 +608,15 @@ onMounted(async () => {
                                 {{ ENGINE_DEFINITIONS[engine]?.name || engine }}
                             </option>
                         </select>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Need more engines?
+                            <a
+                                href="/admin/keys"
+                                class="text-blue-600 hover:underline"
+                            >
+                                Configure API keys with additional TTS engines
+                            </a>
+                        </p>
                     </div>
 
                     <div>
@@ -731,12 +754,30 @@ onMounted(async () => {
                     </h3>
                 </div>
                 <div class="p-6 space-y-4">
+                    <div
+                        v-if="authStore.isDevelopmentMode"
+                        class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md"
+                    >
+                        <p class="text-sm text-blue-800">
+                            <strong>Desktop App Mode:</strong> You're running the
+                            desktop app. The default settings below are
+                            pre-configured for local use. The "dev" key works
+                            automatically with your local proxy server.
+                        </p>
+                    </div>
+
                     <div>
                         <label
                             for="serverUrl"
                             class="block text-sm font-medium text-gray-700 mb-1"
                         >
                             Server URL
+                            <span
+                                v-if="authStore.isDevelopmentMode"
+                                class="text-xs text-gray-500 ml-2"
+                            >
+                                (WebSocket URL for CallTTS.exe)
+                            </span>
                         </label>
                         <input
                             id="serverUrl"
@@ -744,6 +785,9 @@ onMounted(async () => {
                             type="text"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                        <p class="text-xs text-gray-500 mt-1">
+                            The WebSocket endpoint that CallTTS.exe connects to
+                        </p>
                     </div>
 
                     <div>
@@ -758,7 +802,7 @@ onMounted(async () => {
                             v-model="selectedApiKey"
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                            <option value="dev">dev-key (Development)</option>
+                            <option value="dev">dev (Local Desktop App)</option>
                             <option
                                 v-for="key in keysStore.keys"
                                 :key="key.id"
@@ -767,6 +811,15 @@ onMounted(async () => {
                                 {{ key.name }} ({{ key.keySuffix }})
                             </option>
                         </select>
+                        <p class="text-xs text-gray-500 mt-1">
+                            <span v-if="authStore.isDevelopmentMode">
+                                Use "dev" for local desktop app, or select a
+                                specific key for remote server access
+                            </span>
+                            <span v-else>
+                                Select the API key to use for authentication
+                            </span>
+                        </p>
                     </div>
                 </div>
             </div>

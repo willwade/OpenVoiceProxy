@@ -64,9 +64,9 @@ class TtsProxyApp {
                 click: () => this.openUrl('http://localhost:3000/admin/')
             },
             {
-                label: 'Open Configuration',
+                label: 'Open CLI Configuration',
                 type: 'normal',
-                click: () => this.openUrl('http://localhost:3000/admin/config')
+                click: () => this.openUrl('http://localhost:3000/admin/cli-config')
             },
             { type: 'separator' },
             {
