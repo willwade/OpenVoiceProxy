@@ -1,6 +1,23 @@
 # OpenVoiceProxy
 
-OpenVoiceProxy is a TTS proxy and admin UI that mirrors ElevenLabs-style APIs while routing to local or alternative engines (Azure, OpenAI, AWS Polly, Google TTS, eSpeak, ElevenLabs).
+OpenVoiceProxy is a TTS proxy and admin UI that mirrors ElevenLabs-style APIs while routing to local or alternative engines (Azure, OpenAI, AWS Polly, Google TTS, eSpeak, ElevenLabs). It also has a websocket route originally for embedded devices but also a faster solution for desktop. 
+
+So two modes this code works in
+
+1. Server API. Just a regular server API to get TTS over http using endpoints. See [OpenAPI.json](https://github.com/willwade/OpenVoiceProxy/blob/main/tts-proxy/openapi.json) 
+2. Windows Elecron App with installer, task bar app and a CLI. 
+
+So how does 2 actually work?
+
+1. In an AAC app its possible to "Copy" the message bar and "Run" an executable. As long as a user can do that we ask the user to edit their pages to add these commands and call the CLI.exe which in turns calls the web server running. TTS engines are kept in memory reducing cold starts (particularly important for SherpaOnnx) and we *should* be able to do caching. (TO-DO)
+2. If an app supports elevenlabs the app just changes its endpoint to localhost:3000 rather than api.elevenlabs.com and our server gives back voices and TTS data in that format. NB: Its not possible right now to do this without hacking.. 
+
+## What we need to do:
+
+1. The desktop app needs thinking hard over. Its not easy to get your head around due to configs and API keys. We've done a bunch of work to make it "easier" but it needs to be sinple. Install. Configure. Configure AAC app. Done. The first configure tts is still a messy UI pain..
+2. Building this is painful. I wonder if the CLI app needs to actually be a dotnet app as the build code for the CLI is hideously long
+
+
 
 ## Project Layout
 - `tts-proxy/` — core HTTP/WebSocket server and admin UI ([README](tts-proxy/README.md))
