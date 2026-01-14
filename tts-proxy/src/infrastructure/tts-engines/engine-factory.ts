@@ -12,6 +12,7 @@ import { EngineNotAvailableError } from '../../domain/errors/domain-errors.js';
 import { createTTSClient, type SupportedTTS } from 'js-tts-wrapper';
 
 import { JsTtsWrapperEngine } from './wrapper-engine.js';
+import { NativeEspeakEngine } from './espeak-engine.js';
 
 /**
  * Supported engine types
@@ -124,13 +125,26 @@ export class TTSEngineFactory implements TTSEngineFactoryPort {
       throw new EngineNotAvailableError(engineId, 'Unknown engine');
     }
 
-    // Create wrapper around js-tts-wrapper
-    const engine = new JsTtsWrapperEngine(engineId, {
-      supportedFormats: definition.supportedFormats as Array<'mp3' | 'wav' | 'pcm' | 'ogg' | 'opus'>,
-      supportsStreaming: definition.supportsStreaming,
-      supportsTimestamps: false, // js-tts-wrapper doesn't support timestamps
-      supportsSSML: definition.supportsSSML,
-    });
+    let engine: TTSEnginePort;
+
+    // Use native espeak engine instead of js-tts-wrapper
+    // js-tts-wrapper plays audio via aplay instead of returning buffer
+    if (engineId === 'espeak') {
+      engine = new NativeEspeakEngine({
+        supportedFormats: ['wav'] as Array<'mp3' | 'wav' | 'pcm' | 'ogg' | 'opus'>,
+        supportsStreaming: false,
+        supportsTimestamps: false,
+        supportsSSML: false,
+      });
+    } else {
+      // Create wrapper around js-tts-wrapper for other engines
+      engine = new JsTtsWrapperEngine(engineId, {
+        supportedFormats: definition.supportedFormats as Array<'mp3' | 'wav' | 'pcm' | 'ogg' | 'opus'>,
+        supportsStreaming: definition.supportsStreaming,
+        supportsTimestamps: false, // js-tts-wrapper doesn't support timestamps
+        supportsSSML: definition.supportsSSML,
+      });
+    }
 
     await engine.initialize(credentials);
 
