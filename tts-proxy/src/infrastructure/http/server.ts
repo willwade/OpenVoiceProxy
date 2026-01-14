@@ -8,7 +8,8 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { serve } from '@hono/node-server';
+import { createServer as createHttpServer } from 'http';
+import { getRequestListener } from '@hono/node-server';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -23,6 +24,7 @@ import { createHealthRoutes } from './routes/health.routes.js';
 import { createTtsRoutes } from './routes/tts.routes.js';
 import { createAdminRoutes } from './routes/admin.routes.js';
 import { createEsp32Routes } from './routes/esp32.routes.js';
+import { setupWebSocket, setWebSocketDependencies } from '../websocket/ws-handler.js';
 
 // Extend Hono's context with our custom variables
 declare module 'hono' {
@@ -37,8 +39,12 @@ export interface ServerConfig {
   corsOrigin?: string;
 }
 
+import type { TTSEngineFactoryPort } from '../../application/ports/tts-engine-port.js';
+import type { KeyRepositoryPort } from '../../application/ports/key-repository-port.js';
+
 export interface ServerDependencies {
-  // Add dependencies as needed when implementing use cases
+  engineFactory?: TTSEngineFactoryPort;
+  keyRepository?: KeyRepositoryPort;
 }
 
 export function createServer(
@@ -167,28 +173,45 @@ export interface RunningServer {
 
 export async function startServer(
   app: Hono,
-  config?: ServerConfig
+  config?: ServerConfig,
+  dependencies?: ServerDependencies
 ): Promise<RunningServer> {
   const env = getEnv();
   const port = config?.port ?? env.PORT ?? 3000;
   const host = config?.host ?? env.HOST ?? '0.0.0.0';
 
-  return new Promise((resolve) => {
-    const server = serve(
-      {
-        fetch: app.fetch,
+  // Set up WebSocket dependencies if provided
+  if (dependencies?.engineFactory && dependencies?.keyRepository) {
+    setWebSocketDependencies({
+      engineFactory: dependencies.engineFactory,
+      keyRepository: dependencies.keyRepository,
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    // Create HTTP server manually to support WebSocket
+    const httpServer = createHttpServer(getRequestListener(app.fetch));
+
+    // Set up WebSocket on the HTTP server
+    if (dependencies?.engineFactory && dependencies?.keyRepository) {
+      setupWebSocket(httpServer);
+    }
+
+    httpServer.on('error', (error) => {
+      reject(error);
+    });
+
+    httpServer.listen(port, host, () => {
+      console.log(`Server running at http://${host}:${port}`);
+
+      resolve({
+        close: async () => {
+          return new Promise((res) => {
+            httpServer.close(() => res());
+          });
+        },
         port,
-        hostname: host,
-      },
-      (info) => {
-        console.log(`Server running at http://${host}:${info.port}`);
-        resolve({
-          close: async () => {
-            server.close();
-          },
-          port: info.port,
-        });
-      }
-    );
+      });
+    });
   });
 }

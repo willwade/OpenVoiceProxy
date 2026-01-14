@@ -4,7 +4,7 @@ const fs = require('fs');
 class Grid3Simulator {
     constructor(baseUrl = 'http://localhost:3000') {
         this.baseUrl = baseUrl;
-        this.apiKey = 'mock-api-key'; // Grid3 would use a real ElevenLabs API key
+        this.apiKey = process.env.TTS_API_KEY || 'tts_a9515cdc6f9f8a8ffd97b070676a8bcc16f46cd2c20b6dffa3c589e5d6f16949'; // Grid3 would use a real ElevenLabs API key
     }
 
     async makeRequest(path, method = 'GET', data = null) {
@@ -122,7 +122,7 @@ class Grid3Simulator {
                     };
 
                     const ttsResponse = await this.makeRequest(
-                        `/v1/text-to-speech/${voice.voice_id}/stream/with-timestamps`,
+                        `/v1/text-to-speech/${voice.voice_id}`,
                         'POST',
                         ttsData
                     );
@@ -145,7 +145,7 @@ class Grid3Simulator {
                 
                 // Test with invalid voice ID
                 const invalidResponse = await this.makeRequest(
-                    '/v1/text-to-speech/invalid-voice-id/stream/with-timestamps',
+                    '/v1/text-to-speech/invalid-voice-id',
                     'POST',
                     { text: "Test", model_id: "eleven_monolingual_v1" }
                 );
@@ -197,7 +197,7 @@ class Grid3Simulator {
             const startTime = Date.now();
             
             const response = await this.makeRequest(
-                `/v1/text-to-speech/${voice.voice_id}/stream/with-timestamps`,
+                `/v1/text-to-speech/${voice.voice_id}`,
                 'POST',
                 {
                     text: testText,

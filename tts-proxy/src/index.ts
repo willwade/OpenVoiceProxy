@@ -123,14 +123,22 @@ async function main(): Promise<void> {
 
   // Create and start server
   const app = createServer();
-  const server = await startServer(app, {
-    port: env.PORT,
-    host: env.HOST,
-  });
+  const server = await startServer(
+    app,
+    {
+      port: env.PORT,
+      host: env.HOST,
+    },
+    {
+      engineFactory,
+      keyRepository,
+    }
+  );
 
   console.log('=====================');
   console.log(`Server ready at http://${env.HOST}:${server.port}`);
   console.log(`Admin UI at http://${env.HOST}:${server.port}/admin`);
+  console.log(`WebSocket at ws://${env.HOST}:${server.port}/ws`);
 
   // Graceful shutdown
   const shutdown = async () => {
