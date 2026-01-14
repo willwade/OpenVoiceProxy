@@ -52,13 +52,16 @@ const updateKeySchema = z.object({
   expiresAt: z.string().datetime().nullable().optional(),
 });
 
-const engineConfigSchema = z.record(
-  z.object({
-    enabled: z.boolean(),
-    useCustomCredentials: z.boolean().optional(),
-    credentials: z.record(z.string()).optional(),
-  })
-);
+const engineConfigItemSchema = z.object({
+  enabled: z.boolean(),
+  useCustomCredentials: z.boolean().optional(),
+  credentials: z.record(z.string()).optional(),
+});
+
+// Accept either wrapped { engineConfig: ... } or direct config for compatibility
+const engineConfigSchema = z.object({
+  engineConfig: z.record(engineConfigItemSchema),
+});
 
 const credentialsSchema = z.object({
   credentials: z.record(z.string()),
@@ -90,9 +93,12 @@ export function createAdminRoutes(): Hono {
    * GET /admin/api/mode
    */
   routes.get('/api/mode', (c) => {
+    const devMode = isDevelopment();
     const response: AdminModeResponse = {
-      mode: isDevelopment() ? 'development' : 'production',
+      mode: devMode ? 'development' : 'production',
       requiresAuth: isAuthRequired(),
+      // For frontend compatibility
+      isDevelopmentMode: devMode && !isAuthRequired(),
     };
     return c.json(response);
   });
@@ -136,7 +142,11 @@ export function createAdminRoutes(): Hono {
 
     await keyRepository.save(apiKey);
 
-    return c.json(apiKeyToResponse(apiKey, plainKey), 201);
+    // Wrap response for frontend compatibility
+    return c.json({
+      message: 'API key created successfully',
+      key: apiKeyToResponse(apiKey, plainKey),
+    }, 201);
   });
 
   /**
@@ -244,7 +254,8 @@ export function createAdminRoutes(): Hono {
       return c.json({ error: { code: 'NOT_FOUND', message: 'API key not found' } }, 404);
     }
 
-    const updated = apiKey.withUpdatedEngineConfig(body);
+    // Extract engineConfig from wrapped body
+    const updated = apiKey.withUpdatedEngineConfig(body.engineConfig);
     await keyRepository.save(updated);
 
     return c.json({ engineConfig: updated.engineConfig ?? {} });
@@ -362,6 +373,7 @@ export function createAdminRoutes(): Hono {
       const voices = await engine.getVoices();
 
       return c.json({
+        valid: true, // For frontend compatibility
         success: true,
         engine: engineId,
         message: `Successfully connected. ${voices.length} voices available.`,
@@ -369,6 +381,7 @@ export function createAdminRoutes(): Hono {
       });
     } catch (error) {
       return c.json({
+        valid: false, // For frontend compatibility
         success: false,
         engine: engineId,
         message: error instanceof Error ? error.message : 'Unknown error',

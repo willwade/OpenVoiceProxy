@@ -7,7 +7,10 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { serve } from '@hono/node-server';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { getEnv } from '../../config/env.js';
 import type { RequestContext } from '../../types/api.types.js';
@@ -108,9 +111,21 @@ export function createServer(
   const healthRoutes = createHealthRoutes();
   app.route('/', healthRoutes);
 
-  // Auth middleware for protected routes
+  // Static files for admin UI (BEFORE auth middleware)
+  // Get the directory of the current module
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const publicDir = path.resolve(__dirname, '../../../public');
+
+  // Serve admin static files without authentication
+  app.use('/admin/*', serveStatic({ root: publicDir }));
+
+  // Redirect /admin to /admin/
+  app.get('/admin', (c) => c.redirect('/admin/'));
+
+  // Auth middleware for protected routes (admin/api requires auth)
   app.use('/v1/*', authMiddleware);
-  app.use('/admin/*', authMiddleware);
+  app.use('/admin/api/*', authMiddleware);
   app.use('/api/*', authMiddleware);
 
   // Rate limiting for API routes
@@ -121,21 +136,13 @@ export function createServer(
   const ttsRoutes = createTtsRoutes();
   app.route('/v1', ttsRoutes);
 
-  // Admin routes
+  // Admin API routes (mounted under /admin)
   const adminRoutes = createAdminRoutes();
   app.route('/admin', adminRoutes);
 
   // ESP32/Embedded device routes
   const esp32Routes = createEsp32Routes();
   app.route('/api', esp32Routes);
-
-  // Static files for admin UI
-  // Note: In production, this would be handled by a reverse proxy
-  // For now, we'll add a simple handler
-  app.get('/admin', async (c) => {
-    // Redirect to admin UI
-    return c.redirect('/admin/');
-  });
 
   // 404 handler
   app.notFound((c) => {

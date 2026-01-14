@@ -119,6 +119,7 @@ export interface AdminCredentialsRequest {
 }
 
 export interface AdminCredentialsTestResponse {
+  valid: boolean; // For frontend compatibility
   success: boolean;
   engine: string;
   message: string;
@@ -139,6 +140,7 @@ export interface AdminUsageResponse {
 export interface AdminModeResponse {
   mode: 'development' | 'production';
   requiresAuth: boolean;
+  isDevelopmentMode?: boolean; // For frontend compatibility
 }
 
 // ESP32 endpoint types
