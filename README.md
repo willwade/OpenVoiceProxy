@@ -28,7 +28,7 @@ So how does 2 actually work?
 ## Quick Start
 
 ### Web server (tts-proxy)
-- Prereqs: Node 22+, Git, at least one TTS API key.
+- Prereqs: Node 22+, Git, at least one TTS API key (or use free espeak engine).
 - Install:
   ```bash
   git clone https://github.com/willwade/OpenVoiceProxy.git
@@ -47,10 +47,11 @@ So how does 2 actually work?
   ```
 - Run:
   ```bash
-  npm run start:server        # dev
-  npm run start:production    # prod-style
+  npm run start:ts            # TypeScript dev server
+  npm run dev:ts              # TypeScript with hot reload
+  npm run start:production    # production
   ```
-- Check: http://localhost:3000/health, admin at http://localhost:3000/admin.
+- Check: http://localhost:3000/health, admin at http://localhost:3000/admin, WebSocket at ws://localhost:3000/ws.
 
 ### Desktop app (Windows)
 - From `electron-server/` on Windows:
@@ -83,10 +84,12 @@ So how does 2 actually work?
 
 ## Development Notes
 - Node 22+ (`.nvmrc` provided).
+- Server built with TypeScript and Hono framework (clean architecture).
 - Monorepo scripts:
-  - `tts-proxy`: `npm run start:server`, `npm run start:production`, `npm run build`, `npm test`.
+  - `tts-proxy`: `npm run start:ts`, `npm run dev:ts` (hot reload), `npm run start:production`, `npm test` (vitest).
   - `electron-server`: `npm run build:cli`, `npm run build` (NSIS), `npm run build:all`.
 - Admin UI assets build to `tts-proxy/public/admin/` via `npm run build` inside `tts-proxy`.
+- TypeScript source in `tts-proxy/src/` with domain/application/infrastructure layers.
 
 ## License
 
@@ -100,7 +103,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Built with [js-tts-wrapper](https://github.com/willwade/js-tts-wrapper) for TTS engine integration
+- Built with [js-tts-wrapper](https://github.com/willwade/js-tts-wrapper) for cloud TTS engine integration
+- Native espeak-ng support for offline TTS (no API keys required)
 - Inspired by the need for flexible, secure TTS proxy solutions
 - Thanks to all contributors and the open-source community
 
