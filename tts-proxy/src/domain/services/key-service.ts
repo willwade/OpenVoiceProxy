@@ -36,10 +36,6 @@ import {
   ValidationError,
 } from '../errors/domain-errors.js';
 
-export interface KeyServiceDependencies {
-  // Will be injected from application layer
-}
-
 export class KeyService {
   /**
    * Create a new API key

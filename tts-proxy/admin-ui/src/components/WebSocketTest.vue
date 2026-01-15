@@ -60,7 +60,7 @@
 import { ref } from "vue";
 
 const props = defineProps({
-    serverUrl: { type: String, default: "ws://localhost:3000/api/ws" },
+    serverUrl: { type: String, default: "ws://localhost:3000/ws" },
     apiKey: { type: String, default: "dev" },
     engine: { type: String, default: "azure" },
     voice: { type: String, default: "en-US-JennyNeural" },
@@ -260,3 +260,4 @@ function downloadAudio() {
     document.body.removeChild(a);
 }
 </script>
+

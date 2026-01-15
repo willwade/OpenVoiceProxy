@@ -1,4 +1,5 @@
 @echo off
+cd /d %~dp0\..
 echo Testing TTS Proxy Endpoints...
 echo.
 echo Setting up Node.js environment with fnm...
@@ -7,6 +8,6 @@ fnm use v22.16.0
 
 echo.
 echo Running endpoint tests...
-node test-endpoints.js
+npx tsx scripts/test-endpoints.ts
 
 pause

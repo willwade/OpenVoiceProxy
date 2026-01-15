@@ -96,7 +96,7 @@ Defaults can be set with `ESP32_DEFAULT_ENGINE`, `ESP32_DEFAULT_VOICE`, `ESP32_D
 ### WebSocket (ws/wss) Endpoint
 Use WebSockets when you want a single, long-lived connection (including `wss` when TLS is terminated upstream).
 
-- Connect to `ws(s)://<host>/api/ws` with `?api_key=...` or headers `X-API-Key`/`xi-api-key`/`Authorization: Bearer <key>`.
+- Connect to `ws(s)://<host>/ws` with `?api_key=...` or headers `X-API-Key`/`xi-api-key`/`Authorization: Bearer <key>`.
 - Commands:
   - `{"type":"speak","text":"Hello","voice":"en-US-JennyNeural","engine":"azure","format":"pcm16","sample_rate":16000}` → streams binary audio.
   - `{"type":"voices"}` → returns JSON list of available voices.
@@ -105,16 +105,16 @@ Use WebSockets when you want a single, long-lived connection (including `wss` wh
 - To get chunked streaming over WebSocket, add `"stream": true` (optional `"chunk_size": 32000` bytes). The server will still send the meta frame first, then audio chunks; your client must ignore the meta frame and concatenate only the binary frames.
 - Quick test with `wscat`:
   ```bash
-  npx wscat -c "ws://localhost:3000/api/ws?api_key=dev"
+  npx wscat -c "ws://localhost:3000/ws?api_key=dev"
   # then send:
   # {"type":"engines"}
   # {"type":"speak","text":"Hello from WebSocket","engine":"azure","voice":"en-US-JennyNeural","format":"pcm16","sample_rate":16000}
   ```
 - Local `wss` check (self-signed):
   ```bash
-  node scripts/generate-cert.js
+  npx tsx scripts/generate-cert.ts
   npx local-ssl-proxy --source 3443 --target 3000 --key server.key --cert server.crt
-  npx wscat -c "wss://localhost:3443/api/ws?api_key=dev" --no-check
+  npx wscat -c "wss://localhost:3443/ws?api_key=dev" --no-check
   ```
 
 ## Admin API
@@ -275,3 +275,4 @@ The proxy can be configured through:
 - **TTS Integration:** js-tts-wrapper
 - **Logging:** Winston
 - **UI:** HTML/CSS/JavaScript
+

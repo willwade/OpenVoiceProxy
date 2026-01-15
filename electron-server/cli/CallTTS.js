@@ -13,7 +13,7 @@ const CLI_NAME = "CallTTS";
 // Default configuration
 const defaultConfig = {
   server: {
-    url: "ws://localhost:3000/api/ws",
+    url: "ws://localhost:3000/ws",
     apiKey: "dev",
   },
   tts: {
@@ -447,3 +447,4 @@ function formatToFileExtension(format) {
       return "wav";
   }
 }
+

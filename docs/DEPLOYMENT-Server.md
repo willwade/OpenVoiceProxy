@@ -145,7 +145,7 @@ After deployment, you need to create your first admin API key:
 2. **Run the admin key creation script**
    ```bash
    cd tts-proxy
-   node scripts/create-admin-key.js
+   npx tsx scripts/create-admin-key.ts
    ```
 3. **Save the generated API key securely**
 

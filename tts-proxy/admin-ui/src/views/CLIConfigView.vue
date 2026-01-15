@@ -16,7 +16,7 @@ const selectedEngine = ref<string>("azure");
 const selectedVoice = ref<string>("");
 const sampleRate = ref<number>(24000);
 const format = ref<string>("wav");
-const serverUrl = ref<string>("ws://localhost:3000/api/ws");
+const serverUrl = ref<string>("ws://localhost:3000/ws");
 const selectedApiKey = ref<string>("dev");
 const translationEnabled = ref<boolean>(false);
 const translationProvider = ref<string>("google");
@@ -1259,3 +1259,4 @@ onMounted(async () => {
         </div>
     </AppLayout>
 </template>
+

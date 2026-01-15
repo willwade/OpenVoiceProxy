@@ -43,7 +43,7 @@ So how does 2 actually work?
 - Create an initial admin key:
   ```bash
   export ADMIN_API_KEY="your_secure_admin_key_here"
-  node scripts/create-admin-key.js
+  npx tsx scripts/create-admin-key.ts
   ```
 - Run:
   ```bash

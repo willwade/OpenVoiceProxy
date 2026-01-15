@@ -22,6 +22,8 @@ process.on('uncaughtException', (error) => {
 
 // Load environment variables
 const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, '../../.env') });
+config({ path: resolve(__dirname, '../../.env.local') });
 config({ path: resolve(__dirname, '../.env') });
 config({ path: resolve(__dirname, '../.env.local') });
 
