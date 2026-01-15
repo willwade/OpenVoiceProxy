@@ -28,8 +28,14 @@ jobs:
       - name: Install workspace dependencies
         run: npm ci
 
-      - name: Build CLI (.NET) + Electron installer
-        run: npm run -w electron-server build:all
+      - name: Build server assets
+        run: npm run -w tts-proxy build
+
+      - name: Build CLI (.NET)
+        run: npm run -w electron-server build:cli
+
+      - name: Build Electron installer
+        run: npm run -w electron-server build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
