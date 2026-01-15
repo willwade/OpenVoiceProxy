@@ -16,7 +16,7 @@
     "build:all": "npm --prefix ../tts-proxy run build && npm run build:cli && npm run build"
   },
   "dependencies": {
-    "openvoiceproxy": "file:../tts-proxy"
+    "openvoiceproxy": "file:../tts-proxy/openvoiceproxy-1.0.0.tgz"
   },
   "devDependencies": {
     "electron": "^39.2.7",
