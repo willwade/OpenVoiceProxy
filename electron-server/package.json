@@ -9,14 +9,14 @@
   },
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev",
+    "dev": "npm --prefix .. run build:tts && electron . --dev",
     "build": "electron-builder --win",
     "build:nsis": "electron-builder --win nsis",
     "build:cli": "dotnet publish ./cli-dotnet/CallTTS/CallTTS.csproj -c Release -r win-x64 -p:PublishSingleFile=true -p:SelfContained=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o dist",
     "build:all": "npm --prefix ../tts-proxy run build && npm run build:cli && npm run build"
   },
   "dependencies": {
-    "openvoiceproxy": "file:../tts-proxy/openvoiceproxy-1.0.0.tgz"
+    "openvoiceproxy": "^1.0.0"
   },
   "devDependencies": {
     "electron": "^39.2.7",

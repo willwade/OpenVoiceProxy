@@ -1,0 +1,11 @@
+{
+  "name": "openvoiceproxy-root",
+  "private": true,
+  "scripts": {
+    "build:tts": "npm -w tts-proxy run build:ts"
+  },
+  "workspaces": [
+    "tts-proxy",
+    "electron-server"
+  ]
+}

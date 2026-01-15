@@ -48,6 +48,8 @@ const envSchema = z.object({
     .transform((v) => v === 'true' || v === '1')
     .default('false'),
   LOG_DIR: z.string().default('./logs'),
+  OPENVOICEPROXY_DATA_DIR: z.string().optional(),
+  DATA_DIR: z.string().optional(),
 
   // TTS Engine credentials (all optional)
   AZURE_SPEECH_KEY: z.string().optional(),

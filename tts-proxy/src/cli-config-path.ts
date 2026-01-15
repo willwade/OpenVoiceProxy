@@ -13,11 +13,11 @@ export function getCliConfigPath(): string {
 
   let base: string;
   if (process.platform === 'win32') {
-    base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    base = process.env['APPDATA'] || path.join(os.homedir(), 'AppData', 'Roaming');
   } else if (process.platform === 'darwin') {
     base = path.join(os.homedir(), 'Library', 'Application Support');
   } else {
-    base = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+    base = process.env['XDG_CONFIG_HOME'] || path.join(os.homedir(), '.config');
   }
 
   return path.join(base, appName, cliName, 'config.json');

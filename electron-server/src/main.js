@@ -1,44 +1,61 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron');
+const fs = require('fs');
 const path = require('path');
-const ProxyServer = require('openvoiceproxy/src/proxy-server');
-const logger = require('openvoiceproxy/src/logger');
-const { migrateRepoData } = require('openvoiceproxy/src/data-path');
+
+let logFilePath = null;
+function log(message, level = 'info') {
+    const line = `[${new Date().toISOString()}] [${level}] ${message}`;
+    if (level === 'error') {
+        console.error(line);
+    } else {
+        console.log(line);
+    }
+    if (logFilePath) {
+        try {
+            fs.appendFileSync(logFilePath, `${line}\n`, 'utf8');
+        } catch {
+            // Ignore logging failures.
+        }
+    }
+}
 
 class TtsProxyApp {
     constructor() {
         this.proxyServer = null;
         this.tray = null;
         this.mainWindow = null;
+        this.keepAliveWindow = null;
     }
 
     async initialize() {
-        logger.info('Initializing TTS Proxy App');
+        log('Initializing TTS Proxy App');
 
-        // Set local mode for Electron app (skip authentication)
         process.env.LOCAL_MODE = 'true';
-        logger.info('Running in LOCAL_MODE - authentication disabled for desktop app');
-
-        // Migrate any existing repo `data/` files into the runtime userData location
-        try {
-            migrateRepoData();
-            logger.info('Repository data migration (if any) completed');
-        } catch (e) {
-            logger.warn('Repository data migration failed:', e.message || e);
-        }
+        process.env.OPENVOICEPROXY_DATA_DIR = app.getPath('userData');
+        log('Running in LOCAL_MODE - authentication disabled for desktop app');
 
         // Create proxy server
-        this.proxyServer = new ProxyServer();
+        const { ProxyServer } = await import('openvoiceproxy/dist/proxy-server.js');
+        this.proxyServer = new ProxyServer({
+            dataDir: process.env.OPENVOICEPROXY_DATA_DIR,
+            localMode: true
+        });
         await this.proxyServer.start();
 
         // Create system tray
         this.createTray();
 
-        logger.info('TTS Proxy App initialized successfully');
+        log('TTS Proxy App initialized successfully');
     }
 
     createTray() {
         // Create a simple icon for the tray (we'll use a basic icon for now)
         const icon = nativeImage.createFromPath(path.join(__dirname, '../assets/icon.png'));
+        if (icon.isEmpty()) {
+            log('Tray icon failed to load; keeping app alive without tray.', 'error');
+            this.ensureKeepAliveWindow();
+            return;
+        }
         this.tray = new Tray(icon.resize({ width: 16, height: 16 }));
         
         const contextMenu = Menu.buildFromTemplate([
@@ -61,12 +78,12 @@ class TtsProxyApp {
             {
                 label: 'Open Admin Interface',
                 type: 'normal',
-                click: () => this.openUrl('http://localhost:3000/admin/')
+                click: () => this.openUrl(this.getAdminUrl('/admin/'))
             },
             {
                 label: 'Open CLI Configuration',
                 type: 'normal',
-                click: () => this.openUrl('http://localhost:3000/admin/cli-config')
+                click: () => this.openUrl(this.getAdminUrl('/admin/cli-config'))
             },
             { type: 'separator' },
             {
@@ -89,6 +106,22 @@ class TtsProxyApp {
         
         this.tray.setContextMenu(contextMenu);
         this.tray.setToolTip('Grid3 TTS Proxy');
+    }
+
+    ensureKeepAliveWindow() {
+        if (this.keepAliveWindow) return;
+        this.keepAliveWindow = new BrowserWindow({
+            width: 1,
+            height: 1,
+            show: false,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true
+            }
+        });
+        this.keepAliveWindow.on('closed', () => {
+            this.keepAliveWindow = null;
+        });
     }
 
     showConfigWindow() {
@@ -115,7 +148,7 @@ class TtsProxyApp {
     }
 
     showLogs() {
-        logger.info('Opening logs (placeholder - will implement log viewer)');
+        log('Opening logs (placeholder - will implement log viewer)');
     }
 
     openUrl(url) {
@@ -124,7 +157,7 @@ class TtsProxyApp {
     }
 
     async shutdown() {
-        logger.info('Shutting down TTS Proxy App');
+        log('Shutting down TTS Proxy App');
         
         if (this.proxyServer) {
             await this.proxyServer.stop();
@@ -133,13 +166,32 @@ class TtsProxyApp {
         if (this.tray) {
             this.tray.destroy();
         }
+
+        if (this.keepAliveWindow) {
+            this.keepAliveWindow.close();
+        }
+    }
+
+    getAdminUrl(pathname) {
+        const port = this.proxyServer?.port || 3000;
+        return `http://localhost:${port}${pathname}`;
     }
 }
 
 // App event handlers
 app.whenReady().then(async () => {
+    const logsDir = path.join(app.getPath('userData'), 'logs');
+    fs.mkdirSync(logsDir, { recursive: true });
+    logFilePath = path.join(logsDir, 'main.log');
+    log(`Logging to ${logFilePath}`);
+
     const ttsProxyApp = new TtsProxyApp();
-    await ttsProxyApp.initialize();
+    try {
+        await ttsProxyApp.initialize();
+    } catch (error) {
+        log(`Failed to initialize: ${error && error.stack ? error.stack : String(error)}`, 'error');
+        throw error;
+    }
     
     // Store reference for cleanup
     app.ttsProxyApp = ttsProxyApp;
@@ -171,5 +223,14 @@ app.on('second-instance', () => {
 // Ensure single instance
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
+    log('Another instance is already running, exiting.');
     app.quit();
 }
+
+process.on('unhandledRejection', (reason) => {
+    log(`Unhandled rejection: ${reason && reason.stack ? reason.stack : String(reason)}`, 'error');
+});
+
+process.on('uncaughtException', (error) => {
+    log(`Uncaught exception: ${error && error.stack ? error.stack : String(error)}`, 'error');
+});

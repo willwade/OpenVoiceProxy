@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "build:ts": "tsc",
     "build:admin": "cd admin-ui && npm run build",
-    "build": "npm run build:admin",
+    "build": "npm run build:ts && npm run build:admin",
     "build:all": "npm run build",
     "postinstall": "cd admin-ui && npm install"
   },

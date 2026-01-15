@@ -18,23 +18,18 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
+          cache-dependency-path: package-lock.json
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
-      - name: Install server dependencies
+      - name: Install workspace dependencies
         run: npm ci
-        working-directory: tts-proxy
-
-      - name: Install Electron/CLI dependencies
-        run: npm ci
-        working-directory: electron-server
 
       - name: Build CLI (.NET) + Electron installer
-        run: npm run build:all
-        working-directory: electron-server
+        run: npm run -w electron-server build:all
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

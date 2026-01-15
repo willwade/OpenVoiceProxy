@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "electron-server", "electron-server", "{E563D639-B4AE-9181-450C-92C6D0405111}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "cli-dotnet", "cli-dotnet", "{2A556F5F-1082-1F59-5123-CE59A36B3C56}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallTTS", "electron-server\cli-dotnet\CallTTS\CallTTS.csproj", "{0AF3F1AB-B987-1A83-CEC9-B0A9FB186A0B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0AF3F1AB-B987-1A83-CEC9-B0A9FB186A0B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0AF3F1AB-B987-1A83-CEC9-B0A9FB186A0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0AF3F1AB-B987-1A83-CEC9-B0A9FB186A0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0AF3F1AB-B987-1A83-CEC9-B0A9FB186A0B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{2A556F5F-1082-1F59-5123-CE59A36B3C56} = {E563D639-B4AE-9181-450C-92C6D0405111}
+		{0AF3F1AB-B987-1A83-CEC9-B0A9FB186A0B} = {2A556F5F-1082-1F59-5123-CE59A36B3C56}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {51E5FCA2-2AAE-489B-9491-01159C620E4A}
+	EndGlobalSection
+EndGlobal

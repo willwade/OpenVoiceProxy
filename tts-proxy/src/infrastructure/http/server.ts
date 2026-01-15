@@ -10,6 +10,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { createServer as createHttpServer } from 'http';
 import { getRequestListener } from '@hono/node-server';
+import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -121,7 +122,11 @@ export function createServer(
   // Get the directory of the current module
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
-  const publicDir = path.resolve(__dirname, '../../../public');
+  const publicDirCandidates = [
+    path.resolve(__dirname, '../../../public'),
+    path.resolve(__dirname, '../../../../public'),
+  ];
+  const publicDir = publicDirCandidates.find((dir) => existsSync(dir)) ?? publicDirCandidates[0];
 
   // Serve admin static files without authentication
   app.use('/admin/*', serveStatic({ root: publicDir }));

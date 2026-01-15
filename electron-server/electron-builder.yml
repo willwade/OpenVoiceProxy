@@ -11,10 +11,6 @@ files:
 extraResources:
   - from: dist/CallTTS.exe
     to: cli/CallTTS.exe
-  - from: cli/CallTTS.bat
-    to: cli/CallTTS.bat
-  - from: cli/README.md
-    to: cli/README.md
 extraFiles:
   - from: dist/CallTTS.exe
     to: CallTTS.exe

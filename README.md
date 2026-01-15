@@ -19,10 +19,10 @@ So how does 2 actually work?
 
 
 ## Project Layout
-- `tts-proxy/` — core HTTP/WebSocket server and admin UI ([README](tts-proxy/README.md))
-- `electron-server/` — Windows desktop wrapper and installer, ships the CallTTS CLI ([CLI README](electron-server/cli/README.md))
-- `DEPLOYMENT.md` — DigitalOcean App Platform guide
-- `tts-proxy/openapi.json` — OpenAPI description of the HTTP API
+- `tts-proxy/` - core HTTP/WebSocket server and admin UI ([README](tts-proxy/README.md))
+- `electron-server/` - Windows desktop wrapper and installer, ships the CallTTS CLI (.NET)
+- `DEPLOYMENT.md` - DigitalOcean App Platform guide
+- `tts-proxy/openapi.json` - OpenAPI description of the HTTP API
 
 ## Quick Start
 
@@ -53,20 +53,19 @@ So how does 2 actually work?
 - Check: http://localhost:3000/health, admin at http://localhost:3000/admin, WebSocket at ws://localhost:3000/ws.
 
 ### Desktop app (Windows)
-- From `electron-server/` on Windows (requires .NET 8 SDK for the CLI):
+- From the repo root on Windows (requires .NET 8 SDK for the CLI):
   ```bash
   npm install
-  npm run build:all   # builds server assets, CallTTS.exe via .NET, then NSIS installer
+  npm run -w electron-server build:all   # builds server assets, CallTTS.exe via .NET, then NSIS installer
   ```
 - Installer and unpacked app land in `electron-server/dist/`.
 
 ### CallTTS CLI
 - Included in the Windows installer; standalone build:
   ```bash
-  cd electron-server
-  npm run build:cli   # outputs dist/CallTTS.exe
+  npm run -w electron-server build:cli   # outputs electron-server/dist/CallTTS.exe
   ```
-- Usage and config examples: see `electron-server/cli/README.md`.
+- The .NET project lives at `electron-server/cli-dotnet/CallTTS`.
 
 ## API and Admin
 - HTTP + WebSocket endpoints documented in `tts-proxy/openapi.json`.
@@ -85,9 +84,10 @@ So how does 2 actually work?
 - Node 22+ (`.nvmrc` provided).
 - CallTTS CLI builds with .NET 8 (`electron-server/cli-dotnet/CallTTS`).
 - Server built with TypeScript and Hono framework.
-- Monorepo scripts:
-  - `tts-proxy`: `npm run start:ts`, `npm run dev:ts` (hot reload), `npm run start:production`, `npm test` (vitest).
-  - `electron-server`: `npm run build:cli`, `npm run build` (NSIS), `npm run build:all`.
+- Workspace install from repo root: `npm install`.
+- Workspace scripts:
+  - `tts-proxy`: `npm run -w tts-proxy start:ts`, `npm run -w tts-proxy dev:ts`, `npm run -w tts-proxy start:production`.
+  - `electron-server`: `npm run -w electron-server dev`, `npm run -w electron-server build:cli`, `npm run -w electron-server build:all`.
 - Admin UI assets build to `tts-proxy/public/admin/` via `npm run build` inside `tts-proxy`.
 - TypeScript source in `tts-proxy/src/` with domain/application/infrastructure layers.
 
