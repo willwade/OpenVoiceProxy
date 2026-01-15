@@ -84,7 +84,7 @@ So how does 2 actually work?
 ## Development Notes
 - Node 22+ (`.nvmrc` provided).
 - CallTTS CLI builds with .NET 8 (`electron-server/cli-dotnet/CallTTS`).
-- Server built with TypeScript and Hono framework (clean architecture).
+- Server built with TypeScript and Hono framework.
 - Monorepo scripts:
   - `tts-proxy`: `npm run start:ts`, `npm run dev:ts` (hot reload), `npm run start:production`, `npm test` (vitest).
   - `electron-server`: `npm run build:cli`, `npm run build` (NSIS), `npm run build:all`.
