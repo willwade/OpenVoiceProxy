@@ -143,3 +143,7 @@ tts-proxy/*.mp3
 
 # Electron build output
 tts-proxy/dist/
+
+# .NET build output
+electron-server/cli-dotnet/**/bin/
+electron-server/cli-dotnet/**/obj/

@@ -15,7 +15,6 @@ So how does 2 actually work?
 ## What we need to do:
 
 1. The desktop app needs thinking hard over. Its not easy to get your head around due to configs and API keys. We've done a bunch of work to make it "easier" but it needs to be sinple. Install. Configure. Configure AAC app. Done. The first configure tts is still a messy UI pain..
-2. Building this is painful. I wonder if the CLI app needs to actually be a dotnet app as the build code for the CLI is hideously long
 
 
 
@@ -54,10 +53,10 @@ So how does 2 actually work?
 - Check: http://localhost:3000/health, admin at http://localhost:3000/admin, WebSocket at ws://localhost:3000/ws.
 
 ### Desktop app (Windows)
-- From `electron-server/` on Windows:
+- From `electron-server/` on Windows (requires .NET 8 SDK for the CLI):
   ```bash
   npm install
-  npm run build:all   # builds server assets, SEA CallTTS.exe, then NSIS installer
+  npm run build:all   # builds server assets, CallTTS.exe via .NET, then NSIS installer
   ```
 - Installer and unpacked app land in `electron-server/dist/`.
 
@@ -84,6 +83,7 @@ So how does 2 actually work?
 
 ## Development Notes
 - Node 22+ (`.nvmrc` provided).
+- CallTTS CLI builds with .NET 8 (`electron-server/cli-dotnet/CallTTS`).
 - Server built with TypeScript and Hono framework (clean architecture).
 - Monorepo scripts:
   - `tts-proxy`: `npm run start:ts`, `npm run dev:ts` (hot reload), `npm run start:production`, `npm test` (vitest).

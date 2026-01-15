@@ -52,8 +52,8 @@ Remove-Item Env:\CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
 Write-Host "      CSC_IDENTITY_AUTO_DISCOVERY=false" -ForegroundColor Green
 Write-Host "      Code signing variables cleared" -ForegroundColor Green
 
-# Step 4: Build the installer (runs server build, CLI SEA build, then Electron/NSIS)
-Write-Host "[4/4] Building Electron app + CLI (SEA)..." -ForegroundColor Yellow
+# Step 4: Build the installer (runs server build, CLI .NET build, then Electron/NSIS)
+Write-Host "[4/4] Building Electron app + CLI (.NET)..." -ForegroundColor Yellow
 Write-Host ""
 npm run build:all
 

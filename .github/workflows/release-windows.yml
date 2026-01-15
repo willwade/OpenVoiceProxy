@@ -19,21 +19,20 @@ jobs:
           node-version: "22"
           cache: "npm"
 
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
       - name: Install server dependencies
         run: npm ci
         working-directory: tts-proxy
-
-      - name: Cache nexe build artifacts
-        uses: actions/cache@v4
-        with:
-          path: ~/.nexe
-          key: ${{ runner.os }}-nexe-20.17.0-${{ hashFiles('electron-server/package-lock.json') }}
 
       - name: Install Electron/CLI dependencies
         run: npm ci
         working-directory: electron-server
 
-      - name: Build CLI (SEA) + Electron installer
+      - name: Build CLI (.NET) + Electron installer
         run: npm run build:all
         working-directory: electron-server
 

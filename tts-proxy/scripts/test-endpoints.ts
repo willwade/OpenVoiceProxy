@@ -81,13 +81,19 @@ async function runTests(): Promise<boolean> {
   console.log('Testing TTS Proxy Endpoints');
   console.log('='.repeat(50));
 
+  const voicesResult = await testEndpoint('/v1/voices', 'GET');
+  const voices = typeof voicesResult.data === 'object' && voicesResult.data
+    ? (voicesResult.data as { voices?: Array<{ voice_id: string }> }).voices ?? []
+    : [];
+  const voiceId = voices[0]?.voice_id ?? 'espeak:en';
+
   const tests = [
     { name: 'Health Check', path: '/health', method: 'GET' as const },
     { name: 'Get Voices', path: '/v1/voices', method: 'GET' as const },
     { name: 'Get User Info', path: '/v1/user', method: 'GET' as const },
     {
       name: 'Text-to-Speech',
-      path: '/v1/text-to-speech/espeak-en/stream/with-timestamps',
+      path: `/v1/text-to-speech/${voiceId}/stream/with-timestamps`,
       method: 'POST' as const,
       data: {
         text: 'Hello, this is a test of the TTS proxy.',

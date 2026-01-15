@@ -12,8 +12,8 @@ loadEnv(import.meta.url);
 const config = {
   serverUrl: process.env.TTS_WS_URL ?? 'ws://localhost:3000/ws',
   apiKey: process.env.TTS_API_KEY ?? process.env.ADMIN_API_KEY ?? 'dev',
-  engine: process.env.TTS_ENGINE ?? 'azure',
-  voice: process.env.TTS_VOICE ?? 'en-US-JennyNeural',
+  engine: process.env.TTS_ENGINE ?? 'espeak',
+  voice: process.env.TTS_VOICE ?? 'en',
   format: process.env.TTS_FORMAT ?? 'wav',
   sampleRate: Number(process.env.TTS_SAMPLE_RATE ?? 24000),
 };
@@ -38,6 +38,10 @@ const ws = new WebSocket(wsUrl);
 let audioBuffer = Buffer.alloc(0);
 let hasStarted = false;
 const startTime = Date.now();
+const timeout = setTimeout(() => {
+  console.error('Test timed out after 30 seconds');
+  process.exit(1);
+}, 30000);
 
 ws.on('open', () => {
   console.log('WebSocket connection established');
@@ -64,6 +68,7 @@ ws.on('message', (data) => {
       hasStarted = true;
       console.log('Started receiving audio data');
     } else if (type === 'meta') {
+      hasStarted = true;
       console.log(`Metadata: ${JSON.stringify(message)}`);
     } else if (type === 'error' || message.error) {
       console.error(`Server error: ${message.error ?? message.message ?? 'Unknown error'}`);
@@ -79,13 +84,15 @@ ws.on('message', (data) => {
 
       playAudio(filename);
       ws.close();
+      clearTimeout(timeout);
     } else if (type) {
       console.log(`Received message: ${type}`);
     }
   } catch {
-    if (hasStarted) {
-      audioBuffer = Buffer.concat([audioBuffer, Buffer.from(data as Buffer)]);
+    if (!hasStarted) {
+      hasStarted = true;
     }
+    audioBuffer = Buffer.concat([audioBuffer, Buffer.from(data as Buffer)]);
   }
 });
 
@@ -100,13 +107,9 @@ ws.on('close', (code, reason) => {
     process.exit(1);
   } else {
     console.log('WebSocket connection closed normally');
+    clearTimeout(timeout);
   }
 });
-
-setTimeout(() => {
-  console.error('Test timed out after 30 seconds');
-  process.exit(1);
-}, 30000);
 
 function playAudio(filename: string): void {
   if (process.platform === 'win32') {

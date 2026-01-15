@@ -29,8 +29,8 @@ async function run(): Promise<void> {
         JSON.stringify({
           type: 'speak',
           text: 'Hello from the WebSocket audio test.',
-          engine: process.env.TTS_ENGINE ?? 'azure',
-          voice: process.env.TTS_VOICE ?? 'en-US-JennyNeural',
+          engine: process.env.TTS_ENGINE ?? 'espeak',
+          voice: process.env.TTS_VOICE ?? 'en',
           format: process.env.TTS_FORMAT ?? 'wav',
           sample_rate: Number(process.env.TTS_SAMPLE_RATE ?? 24000),
           stream: true,
