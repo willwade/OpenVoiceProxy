@@ -1,4 +1,5 @@
 @echo off
+cd /d %~dp0\..
 echo Simulating Grid3 TTS Workflow...
 echo.
 echo Setting up Node.js environment with fnm...
@@ -7,6 +8,6 @@ fnm use v22.16.0
 
 echo.
 echo Running Grid3 simulation...
-node simulate-grid3.js
+npx tsx scripts/simulate-grid3.ts
 
 pause

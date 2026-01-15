@@ -2,15 +2,15 @@
 
 A command-line interface for the OpenVoiceProxy TTS server, designed for use with AAC (Augmentative and Alternative Communication) applications.
 
-## Building (Windows, Node SEA)
+## Building (Windows, .NET)
 
-Run from `electron-server/` on a Windows machine with Node 20+ (SEA is most stable on Node 22+):
+Run from `electron-server/` on a Windows machine with .NET 8 SDK installed:
 
 ```bash
 npm run build:cli
 ```
 
-This uses Node's SEA flow to create `dist/CallTTS.exe` (and keeps `CallTTS.bat` alongside for convenience). The exe is also pulled into the Electron installer via `npm run build:all`.
+This uses `dotnet publish` to create `dist/CallTTS.exe` (and keeps `CallTTS.bat` alongside for convenience). The exe is also pulled into the Electron installer via `npm run build:all`.
 
 ## Installation
 
@@ -54,7 +54,7 @@ Example configuration file:
 ```json
 {
   "server": {
-    "url": "ws://localhost:3000/api/ws",
+    "url": "ws://localhost:3000/ws",
     "apiKey": "dev"
   },
   "tts": {
@@ -300,7 +300,7 @@ You can test the WebSocket API directly using the provided test script:
 
 ```bash
 # From the tts-proxy directory
-node test-cli-websocket.js
+npx tsx scripts/test-cli-websocket.ts
 ```
 
 This script simulates what the CLI tool does and can help diagnose connection issues.

@@ -15,7 +15,6 @@ So how does 2 actually work?
 ## What we need to do:
 
 1. The desktop app needs thinking hard over. Its not easy to get your head around due to configs and API keys. We've done a bunch of work to make it "easier" but it needs to be sinple. Install. Configure. Configure AAC app. Done. The first configure tts is still a messy UI pain..
-2. Building this is painful. I wonder if the CLI app needs to actually be a dotnet app as the build code for the CLI is hideously long
 
 
 
@@ -28,7 +27,7 @@ So how does 2 actually work?
 ## Quick Start
 
 ### Web server (tts-proxy)
-- Prereqs: Node 22+, Git, at least one TTS API key.
+- Prereqs: Node 22+, Git, at least one TTS API key (or use free espeak engine).
 - Install:
   ```bash
   git clone https://github.com/willwade/OpenVoiceProxy.git
@@ -43,20 +42,21 @@ So how does 2 actually work?
 - Create an initial admin key:
   ```bash
   export ADMIN_API_KEY="your_secure_admin_key_here"
-  node scripts/create-admin-key.js
+  npx tsx scripts/create-admin-key.ts
   ```
 - Run:
   ```bash
-  npm run start:server        # dev
-  npm run start:production    # prod-style
+  npm run start:ts            # TypeScript dev server
+  npm run dev:ts              # TypeScript with hot reload
+  npm run start:production    # production
   ```
-- Check: http://localhost:3000/health, admin at http://localhost:3000/admin.
+- Check: http://localhost:3000/health, admin at http://localhost:3000/admin, WebSocket at ws://localhost:3000/ws.
 
 ### Desktop app (Windows)
-- From `electron-server/` on Windows:
+- From `electron-server/` on Windows (requires .NET 8 SDK for the CLI):
   ```bash
   npm install
-  npm run build:all   # builds server assets, SEA CallTTS.exe, then NSIS installer
+  npm run build:all   # builds server assets, CallTTS.exe via .NET, then NSIS installer
   ```
 - Installer and unpacked app land in `electron-server/dist/`.
 
@@ -83,10 +83,13 @@ So how does 2 actually work?
 
 ## Development Notes
 - Node 22+ (`.nvmrc` provided).
+- CallTTS CLI builds with .NET 8 (`electron-server/cli-dotnet/CallTTS`).
+- Server built with TypeScript and Hono framework (clean architecture).
 - Monorepo scripts:
-  - `tts-proxy`: `npm run start:server`, `npm run start:production`, `npm run build`, `npm test`.
+  - `tts-proxy`: `npm run start:ts`, `npm run dev:ts` (hot reload), `npm run start:production`, `npm test` (vitest).
   - `electron-server`: `npm run build:cli`, `npm run build` (NSIS), `npm run build:all`.
 - Admin UI assets build to `tts-proxy/public/admin/` via `npm run build` inside `tts-proxy`.
+- TypeScript source in `tts-proxy/src/` with domain/application/infrastructure layers.
 
 ## License
 
@@ -100,7 +103,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Built with [js-tts-wrapper](https://github.com/willwade/js-tts-wrapper) for TTS engine integration
+- Built with [js-tts-wrapper](https://github.com/willwade/js-tts-wrapper) for cloud TTS engine integration
+- Native espeak-ng support for offline TTS (no API keys required)
 - Inspired by the need for flexible, secure TTS proxy solutions
 - Thanks to all contributors and the open-source community
 

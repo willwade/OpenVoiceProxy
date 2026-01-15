@@ -1,4 +1,5 @@
 @echo off
+cd /d %~dp0\..
 echo Starting TTS Proxy Server...
 echo.
 echo Setting up Node.js environment with fnm...
@@ -9,6 +10,6 @@ echo.
 echo Starting server on http://localhost:3000
 echo Press Ctrl+C to stop
 echo.
-node src/test-server-only.js
+npm run start:ts
 
 pause

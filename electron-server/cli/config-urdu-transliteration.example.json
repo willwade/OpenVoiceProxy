@@ -1,6 +1,6 @@
 {
   "server": {
-    "url": "ws://localhost:3000/api/ws",
+    "url": "ws://localhost:3000/ws",
     "apiKey": "dev"
   },
   "tts": {
@@ -32,4 +32,5 @@
     "logFile": "C:\\AAC\\logs\\calltts.log"
   }
 }
+
 
