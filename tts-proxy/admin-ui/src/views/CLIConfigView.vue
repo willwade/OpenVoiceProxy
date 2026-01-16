@@ -53,7 +53,7 @@ const voices = ref<
     Array<{
         id: string;
         name: string;
-        languages: string[];
+        engine?: string;
         language?: string;
         locale?: string;
         gender?: string;
@@ -70,6 +70,9 @@ const scriptsError = ref<string | null>(null);
 
 // Computed properties
 const configJson = computed(() => {
+    const voiceId = selectedVoice.value.startsWith(`${selectedEngine.value}:`)
+        ? selectedVoice.value.split(":").slice(1).join(":")
+        : selectedVoice.value;
     const config: any = {
         server: {
             url: serverUrl.value,
@@ -77,7 +80,7 @@ const configJson = computed(() => {
         },
         tts: {
             engine: selectedEngine.value,
-            voice: selectedVoice.value,
+            voice: voiceId,
             format: format.value,
             sampleRate: sampleRate.value,
         },
@@ -129,6 +132,20 @@ const exampleCommand = computed(() => {
 const selectedVoiceDetails = computed(() => {
     return voices.value.find((v) => v.id === selectedVoice.value);
 });
+
+const filteredVoices = computed(() => {
+    return voices.value.filter((v) => v.engine === selectedEngine.value);
+});
+
+function formatVoiceLabel(voice: {
+    id: string;
+    name: string;
+    language?: string;
+    locale?: string;
+}) {
+    const language = voice.language || voice.locale || "unknown";
+    return `${language} - ${voice.name} - ${voice.id}`;
+}
 
 function formatKeyPreview(value: string): string {
     if (value.length <= 8) return value;
@@ -227,24 +244,26 @@ async function loadVoices() {
     isLoadingVoices.value = true;
 
     try {
-        const response = await fetch(
-            `/api/voices?engine=${selectedEngine.value}`,
-            {
-                headers: authStore.getHeaders(),
-            },
-        );
+        const response = await fetch(`/api/voices`, {
+            headers: authStore.getHeaders(),
+        });
 
         if (response.ok) {
             const data = await response.json();
-            voices.value = data.voices || [];
+            voices.value = (data.voices || []).map((voice: any) => ({
+                id: voice.id,
+                name: voice.name || voice.id,
+                engine: voice.engine,
+                language: voice.language,
+            }));
 
             // Auto-select first voice if none selected or selected voice not available
             if (
                 !selectedVoice.value ||
-                !voices.value.find((v) => v.id === selectedVoice.value)
+                !filteredVoices.value.find((v) => v.id === selectedVoice.value)
             ) {
-                if (voices.value.length > 0 && voices.value[0]) {
-                    selectedVoice.value = voices.value[0].id;
+                if (filteredVoices.value.length > 0 && filteredVoices.value[0]) {
+                    selectedVoice.value = filteredVoices.value[0].id;
                 }
             }
         }
@@ -448,7 +467,10 @@ async function loadLocalAdminKey() {
             localAdminKey.value = data.key;
             localAdminKeyName.value = data.name || "Local Admin Key";
             localAdminKeyCreatedAt.value = data.createdAt || null;
-            if (!keysStore.keys.length || selectedApiKey.value === "dev") {
+            const matchingSuffix = keysStore.keys.find(
+                (key) => key.keySuffix === selectedApiKey.value
+            );
+            if (!keysStore.keys.length || selectedApiKey.value === "dev" || matchingSuffix) {
                 selectedApiKey.value = data.key;
             }
         }
@@ -556,6 +578,10 @@ watch(translationEnabled, (enabled) => {
             loadTransliterationScripts();
         }
     }
+});
+
+watch(selectedEngine, async () => {
+    await loadVoices();
 });
 
 // Lifecycle
@@ -671,22 +697,11 @@ onMounted(async () => {
                                 class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option
-                                    v-for="voice in voices"
+                                    v-for="voice in filteredVoices"
                                     :key="voice.id"
                                     :value="voice.id"
                                 >
-                                    {{
-                                        voice.name
-                                    }}
-                                    {{
-                                        voice.languages && voice.languages.length
-                                            ? ` (${voice.languages.join(', ')})`
-                                            : voice.language
-                                                ? ` (${voice.language})`
-                                                : voice.locale
-                                                    ? ` (${voice.locale})`
-                                                    : ""
-                                    }}
+                                    {{ formatVoiceLabel(voice) }}
                                 </option>
                             </select>
                             <button
@@ -701,24 +716,7 @@ onMounted(async () => {
                             v-if="selectedVoiceDetails"
                             class="text-xs text-gray-500 mt-1"
                         >
-                            <span
-                                v-if="
-                                    selectedVoiceDetails.languages &&
-                                    selectedVoiceDetails.languages.length > 0
-                                "
-                            >
-                                {{ selectedVoiceDetails.languages.join(", ") }}
-                            </span>
-                            {{
-                                selectedVoiceDetails.gender
-                                    ? `• ${selectedVoiceDetails.gender}`
-                                    : ""
-                            }}
-                            {{
-                                selectedVoiceDetails.type
-                                    ? `• ${selectedVoiceDetails.type}`
-                                    : ""
-                            }}
+                            {{ formatVoiceLabel(selectedVoiceDetails) }}
                         </div>
                     </div>
 

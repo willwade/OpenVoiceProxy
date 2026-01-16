@@ -238,10 +238,29 @@ export class JsTtsWrapperEngine extends BaseEngine {
       }
     }
 
+    // Try synthToBytesWithFormat/synthToBytes (js-tts-wrapper standard)
+    if (this.client.synthToBytesWithFormat) {
+      try {
+        result = await this.client.synthToBytesWithFormat(request.text, options);
+        if (result) return Buffer.isBuffer(result) ? result : Buffer.from(result);
+      } catch (e) {
+        console.warn(`synthToBytesWithFormat failed for ${this.engineId}:`, e);
+      }
+    }
+
+    if (this.client.synthToBytes) {
+      try {
+        result = await this.client.synthToBytes(request.text, options);
+        if (result) return Buffer.isBuffer(result) ? result : Buffer.from(result);
+      } catch (e) {
+        console.warn(`synthToBytes failed for ${this.engineId}:`, e);
+      }
+    }
+
     // Try synthesize method
     if (this.client.synthesize) {
       result = await this.client.synthesize(request.text, options);
-    } else {
+    } else if (this.client.speak) {
       result = await this.client.speak(request.text, options);
     }
 

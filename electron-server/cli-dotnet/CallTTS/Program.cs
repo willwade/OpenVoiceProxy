@@ -1,9 +1,9 @@
-using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NAudio.Wave;
 using TextCopy;
 
 internal sealed class Program
@@ -74,7 +74,7 @@ internal sealed class Program
 
             if (config.Output.PlayAudio)
             {
-                PlayAudio(audio, config.Tts.Format, log);
+                PlayAudio(audio, config.Tts.Format, config.Tts.SampleRate, log);
             }
 
             log.Info("TTS generation completed successfully");
@@ -198,6 +198,39 @@ internal sealed class Program
         return audioStream.ToArray();
     }
 
+    private static void PlayAudio(byte[] audio, string format, int sampleRate, Logger log)
+    {
+        try
+        {
+            using var reader = CreateAudioReader(audio, format, sampleRate);
+            using var outputDevice = new WaveOutEvent();
+            using var playbackCompleted = new ManualResetEventSlim(false);
+
+            outputDevice.PlaybackStopped += (_, _) => playbackCompleted.Set();
+            outputDevice.Init(reader);
+            outputDevice.Play();
+            playbackCompleted.Wait();
+        }
+        catch (Exception ex)
+        {
+            log.Warn($"Failed to play audio: {ex.Message}");
+        }
+    }
+
+    private static WaveStream CreateAudioReader(byte[] audio, string format, int sampleRate)
+    {
+        var normalized = format.ToLowerInvariant();
+        var stream = new MemoryStream(audio, writable: false);
+
+        return normalized switch
+        {
+            "wav" => new WaveFileReader(stream),
+            "mp3" => new Mp3FileReader(stream),
+            "pcm16" => new RawSourceWaveStream(stream, new WaveFormat(sampleRate, 16, 1)),
+            _ => new WaveFileReader(stream),
+        };
+    }
+
     private static string AppendApiKey(string url, string apiKey)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -266,50 +299,6 @@ internal sealed class Program
         }
 
         return WsMessage.Binary(payload.ToArray());
-    }
-
-    private static void PlayAudio(byte[] audio, string format, Logger log)
-    {
-        var extension = FormatToExtension(format);
-        var tempFile = Path.Combine(Path.GetTempPath(), $"calltts-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.{extension}");
-
-        try
-        {
-            File.WriteAllBytes(tempFile, audio);
-
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = tempFile,
-                UseShellExecute = true,
-            };
-            Process.Start(startInfo);
-        }
-        catch (Exception ex)
-        {
-            log.Warn($"Failed to play audio: {ex.Message}");
-        }
-        finally
-        {
-            try
-            {
-                File.Delete(tempFile);
-            }
-            catch
-            {
-                // Ignore cleanup errors
-            }
-        }
-    }
-
-    private static string FormatToExtension(string format)
-    {
-        return format.ToLowerInvariant() switch
-        {
-            "wav" => "wav",
-            "mp3" => "mp3",
-            "pcm16" => "pcm",
-            _ => "wav",
-        };
     }
 
     private static void PrintHelp()

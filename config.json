@@ -1,0 +1,24 @@
+{
+  "server": {
+    "url": "ws://localhost:3000/ws",
+    "apiKey": "ffzoYaxRO80KSxERPvdJwi_X0evXymZWujptjbvewPo"
+  },
+  "tts": {
+    "engine": "azure",
+    "voice": "en-GB-LibbyNeural",
+    "format": "wav",
+    "sampleRate": 24000
+  },
+  "translation": {
+    "enabled": false
+  },
+  "input": {
+    "useClipboard": true,
+    "overwriteClipboardOnCompletion": false
+  },
+  "output": {
+    "playAudio": true,
+    "saveToFile": false,
+    "logFile": "C:\\AAC\\logs\\calltts.log"
+  }
+}
