@@ -11,6 +11,12 @@ files:
 extraResources:
   - from: dist/CallTTS.exe
     to: cli/CallTTS.exe
+  - from: ../tts-proxy/dist
+    to: openvoiceproxy/dist
+  - from: ../tts-proxy/node_modules
+    to: openvoiceproxy/node_modules
+  - from: ../tts-proxy/package.json
+    to: openvoiceproxy/package.json
 extraFiles:
   - from: dist/CallTTS.exe
     to: CallTTS.exe

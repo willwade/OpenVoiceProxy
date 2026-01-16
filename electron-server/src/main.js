@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 let logFilePath = null;
 function log(message, level = 'info') {
@@ -35,7 +36,7 @@ class TtsProxyApp {
         log('Running in LOCAL_MODE - authentication disabled for desktop app');
 
         // Create proxy server
-        const { ProxyServer } = await import('openvoiceproxy/dist/proxy-server.js');
+        const { ProxyServer } = await loadProxyServer();
         this.proxyServer = new ProxyServer({
             dataDir: process.env.OPENVOICEPROXY_DATA_DIR,
             localMode: true
@@ -175,6 +176,16 @@ class TtsProxyApp {
     getAdminUrl(pathname) {
         const port = this.proxyServer?.port || 3000;
         return `http://localhost:${port}${pathname}`;
+    }
+}
+
+async function loadProxyServer() {
+    try {
+        return await import('openvoiceproxy/dist/proxy-server.js');
+    } catch (error) {
+        const packagedPath = path.join(process.resourcesPath, 'openvoiceproxy', 'dist', 'proxy-server.js');
+        log(`Falling back to packaged proxy server at ${packagedPath}`, 'warn');
+        return await import(pathToFileURL(packagedPath).href);
     }
 }
 
