@@ -25,7 +25,11 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await fetch('/admin/api/mode')
       if (response.ok) {
         const data = await response.json()
-        if (data.isDevelopmentMode) {
+        const allowDev =
+          data?.isDevelopmentMode ||
+          data?.localMode ||
+          (data?.mode === 'development' && data?.requiresAuth === false)
+        if (allowDev) {
           isDevelopmentMode.value = true
           user.value = { id: 'dev', name: 'Development User', isAdmin: true }
           hasCheckedDevMode.value = true

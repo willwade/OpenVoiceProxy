@@ -141,6 +141,7 @@ export interface AdminModeResponse {
   mode: 'development' | 'production';
   requiresAuth: boolean;
   isDevelopmentMode?: boolean; // For frontend compatibility
+  localMode?: boolean;
 }
 
 // ESP32 endpoint types

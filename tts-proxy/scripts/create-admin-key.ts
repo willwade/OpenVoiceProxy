@@ -5,7 +5,7 @@
  * Run with: npx tsx scripts/create-admin-key.ts
  */
 
-import { dirname } from 'path';
+import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'node:readline/promises';
 import process from 'node:process';
@@ -56,7 +56,10 @@ async function createAdminKey(): Promise<void> {
 
   console.log('Creating admin API key...');
 
-  const dataDir = resolve(__dirname, '../data');
+  const dataDir =
+    env.OPENVOICEPROXY_DATA_DIR ??
+    env.DATA_DIR ??
+    resolve(__dirname, '../data');
   const keyRepository = await getKeyRepository(dataDir);
 
   const existingKeys = await keyRepository.findAll();
@@ -87,6 +90,15 @@ async function createAdminKey(): Promise<void> {
   });
 
   await keyRepository.save(apiKey);
+
+  if (env.LOCAL_MODE) {
+    const storage = new FileStorage({ dataDir });
+    await storage.writeJson('local-admin-key', {
+      key: plainKey,
+      name: apiKey.name,
+      createdAt: apiKey.createdAt.toISOString(),
+    });
+  }
 
   console.log('Admin API key created successfully.');
   console.log('');

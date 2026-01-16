@@ -51,12 +51,14 @@ export async function authMiddleware(c: Context, next: Next): Promise<Response |
   // Skip auth in development mode unless explicitly required
   if (!isAuthRequired()) {
     ctx.isDevMode = true;
+    ctx.isAdmin = true;
     return next();
   }
 
   // Skip auth in local mode (Electron desktop app)
   if (env.LOCAL_MODE) {
     ctx.isLocalMode = true;
+    ctx.isAdmin = true;
     return next();
   }
 

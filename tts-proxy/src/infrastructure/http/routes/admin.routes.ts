@@ -13,7 +13,8 @@ import type { KeyRepositoryPort } from '../../../application/ports/key-repositor
 import type { CredentialsStoragePort } from '../../../application/ports/storage-port.js';
 import type { TTSEngineFactoryPort } from '../../../application/ports/tts-engine-port.js';
 import { ENGINE_DEFINITIONS } from '../../../types/engine.types.js';
-import { isAuthRequired, isDevelopment } from '../../../config/env.js';
+import { getEnv, isAuthRequired, isDevelopment } from '../../../config/env.js';
+import type { FileStorage } from '../../persistence/file/file-storage.js';
 import type {
   AdminKeyResponse,
   AdminKeysListResponse,
@@ -25,15 +26,18 @@ import type {
 let keyRepository: KeyRepositoryPort | null = null;
 let credentialsStorage: CredentialsStoragePort | null = null;
 let engineFactory: TTSEngineFactoryPort | null = null;
+let localKeyStorage: FileStorage | null = null;
 
 export function setAdminDependencies(deps: {
   keyRepository?: KeyRepositoryPort;
   credentialsStorage?: CredentialsStoragePort;
   engineFactory?: TTSEngineFactoryPort;
+  localKeyStorage?: FileStorage;
 }): void {
   if (deps.keyRepository) keyRepository = deps.keyRepository;
   if (deps.credentialsStorage) credentialsStorage = deps.credentialsStorage;
   if (deps.engineFactory) engineFactory = deps.engineFactory;
+  if (deps.localKeyStorage) localKeyStorage = deps.localKeyStorage;
 }
 
 // Validation schemas
@@ -85,8 +89,8 @@ function apiKeyToResponse(apiKey: ApiKey, plainKey?: string): AdminKeyResponse {
 export function createAdminRoutes(): Hono {
   const routes = new Hono();
 
-  // All admin routes require admin authentication
-  routes.use('/*', adminOnlyMiddleware);
+  // Admin API routes require admin authentication
+  routes.use('/api/*', adminOnlyMiddleware);
 
   /**
    * Get authentication mode
@@ -94,13 +98,38 @@ export function createAdminRoutes(): Hono {
    */
   routes.get('/api/mode', (c) => {
     const devMode = isDevelopment();
+    const env = getEnv();
     const response: AdminModeResponse = {
       mode: devMode ? 'development' : 'production',
       requiresAuth: isAuthRequired(),
       // For frontend compatibility
       isDevelopmentMode: devMode && !isAuthRequired(),
+      localMode: env.LOCAL_MODE,
     };
     return c.json(response);
+  });
+
+  /**
+   * Get local admin key (desktop mode only)
+   * GET /admin/api/local-admin-key
+   */
+  routes.get('/api/local-admin-key', async (c) => {
+    const env = getEnv();
+    if (!env.LOCAL_MODE) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Not available' } }, 404);
+    }
+    if (!localKeyStorage) {
+      return c.json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Local key storage not available' } }, 503);
+    }
+    const record = await localKeyStorage.readJson<{
+      key: string;
+      name: string;
+      createdAt: string;
+    }>('local-admin-key');
+    if (!record?.key) {
+      return c.json({ error: { code: 'NOT_FOUND', message: 'Local admin key not found' } }, 404);
+    }
+    return c.json(record);
   });
 
   /**

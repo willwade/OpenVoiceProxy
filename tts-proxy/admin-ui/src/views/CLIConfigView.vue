@@ -33,6 +33,9 @@ const saveToFile = ref<boolean>(false);
 const outputPath = ref<string>("");
 const logFile = ref<string>("C:\\AAC\\logs\\calltts.log");
 const testText = ref<string>("Hello, this is a test.");
+const localAdminKey = ref<string | null>(null);
+const localAdminKeyName = ref<string>("Local Admin Key");
+const localAdminKeyCreatedAt = ref<string | null>(null);
 
 // Loading and error states
 const isLoadingVoices = ref<boolean>(false);
@@ -126,6 +129,11 @@ const exampleCommand = computed(() => {
 const selectedVoiceDetails = computed(() => {
     return voices.value.find((v) => v.id === selectedVoice.value);
 });
+
+function formatKeyPreview(value: string): string {
+    if (value.length <= 8) return value;
+    return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
 
 // Methods
 async function loadEngines() {
@@ -422,6 +430,33 @@ function copyCommandToClipboard() {
         .catch((err) => console.error("Failed to copy:", err));
 }
 
+function copyLocalAdminKey() {
+    if (!localAdminKey.value) return;
+    navigator.clipboard
+        .writeText(localAdminKey.value)
+        .then(() => alert("Admin key copied to clipboard!"))
+        .catch((err) => console.error("Failed to copy:", err));
+}
+
+async function loadLocalAdminKey() {
+    if (!authStore.isDevelopmentMode) return;
+    try {
+        const response = await fetch("/admin/api/local-admin-key");
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data?.key) {
+            localAdminKey.value = data.key;
+            localAdminKeyName.value = data.name || "Local Admin Key";
+            localAdminKeyCreatedAt.value = data.createdAt || null;
+            if (!keysStore.keys.length || selectedApiKey.value === "dev") {
+                selectedApiKey.value = data.key;
+            }
+        }
+    } catch (error) {
+        console.error("Error loading local admin key:", error);
+    }
+}
+
 function downloadConfig() {
     const blob = new Blob([configJson.value], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -548,6 +583,8 @@ onMounted(async () => {
             await loadTransliterationScripts();
         }
     }
+
+    await loadLocalAdminKey();
 });
 </script>
 
@@ -758,12 +795,33 @@ onMounted(async () => {
                         v-if="authStore.isDevelopmentMode"
                         class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md"
                     >
-                        <p class="text-sm text-blue-800">
+                        <div class="text-sm text-blue-800">
                             <strong>Desktop App Mode:</strong> You're running the
-                            desktop app. The default settings below are
-                            pre-configured for local use. The "dev" key works
-                            automatically with your local proxy server.
-                        </p>
+                            desktop app. Local access does not require a login.
+                        </div>
+                        <div v-if="localAdminKey" class="mt-3">
+                            <div class="text-xs font-medium text-blue-900">
+                                Admin key for AAC clients
+                            </div>
+                            <div class="text-xs text-blue-800 mt-1">
+                                {{ localAdminKeyName }}
+                                <span v-if="localAdminKeyCreatedAt">
+                                    (created {{ localAdminKeyCreatedAt }})
+                                </span>
+                            </div>
+                            <div class="mt-2 flex items-center gap-2">
+                                <div class="font-mono text-xs break-all bg-white border border-blue-200 rounded px-2 py-1 flex-1">
+                                    {{ localAdminKey }}
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="copyLocalAdminKey"
+                                    class="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div>
@@ -803,6 +861,9 @@ onMounted(async () => {
                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="dev">dev (Local Desktop App)</option>
+                            <option v-if="localAdminKey" :value="localAdminKey">
+                                Local Admin Key ({{ formatKeyPreview(localAdminKey) }})
+                            </option>
                             <option
                                 v-for="key in keysStore.keys"
                                 :key="key.id"
@@ -813,7 +874,7 @@ onMounted(async () => {
                         </select>
                         <p class="text-xs text-gray-500 mt-1">
                             <span v-if="authStore.isDevelopmentMode">
-                                Use "dev" for local desktop app, or select a
+                                Use the Local Admin Key for AAC clients, or a
                                 specific key for remote server access
                             </span>
                             <span v-else>

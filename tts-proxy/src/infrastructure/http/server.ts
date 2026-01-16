@@ -10,7 +10,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { createServer as createHttpServer } from 'http';
 import { getRequestListener } from '@hono/node-server';
-import { existsSync } from 'fs';
+import { existsSync, promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -118,22 +118,6 @@ export function createServer(
   const healthRoutes = createHealthRoutes();
   app.route('/', healthRoutes);
 
-  // Static files for admin UI (BEFORE auth middleware)
-  // Get the directory of the current module
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const publicDirCandidates = [
-    path.resolve(__dirname, '../../../public'),
-    path.resolve(__dirname, '../../../../public'),
-  ];
-  const publicDir = publicDirCandidates.find((dir) => existsSync(dir)) ?? publicDirCandidates[0];
-
-  // Serve admin static files without authentication
-  app.use('/admin/*', serveStatic({ root: publicDir }));
-
-  // Redirect /admin to /admin/
-  app.get('/admin', (c) => c.redirect('/admin/'));
-
   // Auth middleware for protected routes (admin/api requires auth)
   app.use('/v1/*', authMiddleware);
   app.use('/admin/api/*', authMiddleware);
@@ -154,6 +138,42 @@ export function createServer(
   // ESP32/Embedded device routes
   const esp32Routes = createEsp32Routes();
   app.route('/api', esp32Routes);
+
+  // Static files for admin UI (after admin API routes)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const publicDirCandidates = [
+    path.resolve(__dirname, '../../../public'),
+    path.resolve(__dirname, '../../../../public'),
+  ];
+  const publicDir =
+    publicDirCandidates.find((dir) => existsSync(dir)) ?? publicDirCandidates[0]!;
+
+  // Serve admin assets without authentication
+  app.use('/admin/assets/*', serveStatic({ root: publicDir }));
+  app.use('/admin/vite.svg', serveStatic({ root: publicDir }));
+
+  // Redirect /admin to /admin/
+  app.get('/admin', (c) => c.redirect('/admin/'));
+
+  // SPA fallback for admin routes (e.g., /admin/login, /admin/cli-config)
+  app.get('/admin/*', async (c) => {
+    const indexPath = path.join(publicDir, 'admin', 'index.html');
+    try {
+      const html = await fs.readFile(indexPath, 'utf-8');
+      return c.html(html);
+    } catch {
+      return c.json(
+        {
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Admin UI not built. Run npm run -w tts-proxy build:admin.',
+          },
+        },
+        404
+      );
+    }
+  });
 
   // 404 handler
   app.notFound((c) => {

@@ -15,6 +15,7 @@ import { FileStorage, FileCredentialsStorage } from './infrastructure/persistenc
 import { FileKeyRepository } from './infrastructure/persistence/file/key-repository.js';
 import { getPostgresKeyRepository } from './infrastructure/persistence/postgres/key-repository.js';
 import { isDatabaseAvailable, initializeSchema } from './infrastructure/persistence/postgres/connection.js';
+import { getKeyService } from './domain/services/key-service.js';
 import type { RunningServer } from './infrastructure/http/server.js';
 import type { KeyRepositoryPort } from './application/ports/key-repository-port.js';
 import type { EngineType } from './types/engine.types.js';
@@ -24,6 +25,12 @@ export interface ProxyServerOptions {
   host?: string;
   dataDir?: string;
   localMode?: boolean;
+}
+
+interface LocalAdminKeyRecord {
+  key: string;
+  name: string;
+  createdAt: string;
 }
 
 export class ProxyServer {
@@ -86,6 +93,8 @@ export class ProxyServer {
       keyRepository = new FileKeyRepository(fileStorage);
     }
 
+    await this.ensureLocalAdminKey(fileStorage, keyRepository, env);
+
     console.log('Initializing TTS engines...');
     const engineFactory = getEngineFactory();
     const engineTypes: EngineType[] = [
@@ -128,6 +137,7 @@ export class ProxyServer {
       keyRepository,
       credentialsStorage,
       engineFactory,
+      localKeyStorage: fileStorage,
     });
     setEsp32Dependencies({
       engineFactory,
@@ -162,5 +172,49 @@ export class ProxyServer {
     await this.runningServer.close();
     this.runningServer = null;
     this.portValue = null;
+  }
+
+  private async ensureLocalAdminKey(
+    fileStorage: FileStorage,
+    keyRepository: KeyRepositoryPort,
+    env: ReturnType<typeof getEnv>
+  ): Promise<void> {
+    if (!env.LOCAL_MODE && !this.options.localMode) return;
+
+    const existingRecord = await fileStorage.readJson<LocalAdminKeyRecord>('local-admin-key');
+    if (existingRecord?.key) {
+      if (!process.env['ADMIN_API_KEY']) {
+        process.env['ADMIN_API_KEY'] = existingRecord.key;
+      }
+      return;
+    }
+
+    const existingKeys = await keyRepository.findAll();
+    const hasAdmin = existingKeys.some((key) => key.isAdmin);
+
+    const keyService = getKeyService();
+    const { apiKey, plainKey } = keyService.createKey({
+      name: 'Local Admin Key',
+      isAdmin: true,
+      rateLimit: env.RATE_LIMIT_REQUESTS,
+    });
+
+    if (!hasAdmin) {
+      await keyRepository.save(apiKey);
+    } else {
+      // Store a dedicated local admin key so the UI can show it.
+      await keyRepository.save(apiKey);
+    }
+
+    const record: LocalAdminKeyRecord = {
+      key: plainKey,
+      name: apiKey.name,
+      createdAt: apiKey.createdAt.toISOString(),
+    };
+
+    await fileStorage.writeJson('local-admin-key', record);
+    if (!process.env['ADMIN_API_KEY']) {
+      process.env['ADMIN_API_KEY'] = plainKey;
+    }
   }
 }
