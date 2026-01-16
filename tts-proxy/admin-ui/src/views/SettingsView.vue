@@ -71,6 +71,11 @@ function getEngineStatus(engineId: string) {
 function isConfigured(engineId: string): boolean {
   return settingsStore.hasCredentials(engineId)
 }
+
+function usesEnvCredentials(engineId: string): boolean {
+  const status = getEngineStatus(engineId)
+  return !isConfigured(engineId) && !!status?.valid
+}
 </script>
 
 <template>
@@ -119,6 +124,12 @@ function isConfigured(engineId: string): boolean {
                   class="text-xs px-2 py-1 rounded"
                 >
                   {{ isConfigured(engineId as string) ? 'Configured' : 'Not Configured' }}
+                </span>
+                <span
+                  v-if="usesEnvCredentials(engineId as string)"
+                  class="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800"
+                >
+                  Using ENV
                 </span>
                 <span class="text-gray-400">
                   {{ expandedEngine === engineId ? '▲' : '▼' }}
