@@ -44,6 +44,11 @@ So how does 2 actually work?
   export ADMIN_API_KEY="your_secure_admin_key_here"
   npx tsx scripts/create-admin-key.ts
   ```
+or if tsx is not installed globally:
+  ```bash
+  npm exec -w tts-proxy -- tsx scripts/create-admin-key.ts
+  ```
+
 - Run:
   ```bash
   npm run start:ts            # TypeScript dev server
@@ -130,6 +135,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Inspired by the need for flexible, secure TTS proxy solutions
 - Thanks to all contributors and the open-source community
 
----
-
-**Made with ❤️ for the accessibility and TTS community**
