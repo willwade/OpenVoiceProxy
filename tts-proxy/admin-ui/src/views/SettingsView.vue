@@ -108,7 +108,7 @@ function isConfigured(engineId: string): boolean {
               <div class="flex items-center gap-3">
                 <!-- Status indicator -->
                 <span
-                  v-if="getEngineStatus(engineId as string)"
+                  v-if="isConfigured(engineId as string) && getEngineStatus(engineId as string)"
                   :class="getEngineStatus(engineId as string)?.valid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
                   class="text-xs px-2 py-1 rounded"
                 >

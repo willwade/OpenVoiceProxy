@@ -91,6 +91,28 @@ So how does 2 actually work?
 - Admin UI assets build to `tts-proxy/public/admin/` via `npm run build` inside `tts-proxy`.
 - TypeScript source in `tts-proxy/src/` with domain/application/infrastructure layers.
 
+## Local Desktop vs Server Mode (Dev)
+
+### Local desktop app (Electron)
+- Run:
+  ```bash
+  npm run -w electron-server dev
+  ```
+- The app runs in `LOCAL_MODE=true` and does not require a login.
+- A **Local Admin Key** is auto-created and shown in the Admin UI:
+  `http://localhost:3000/admin/cli-config` (copy it for AAC client configs).
+
+### Server mode (no Electron)
+- Run:
+  ```bash
+  npm run -w tts-proxy start:ts
+  ```
+- Admin UI at `http://localhost:3000/admin`.
+- For a fixed admin key in dev, set `ADMIN_API_KEY` in `.env` or run:
+  ```bash
+  npm exec -w tts-proxy -- tsx scripts/create-admin-key.ts
+  ```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
