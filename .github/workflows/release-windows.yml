@@ -43,7 +43,6 @@ jobs:
           name: openvoiceproxy-windows
           path: |
             electron-server/dist/*.exe
-            electron-server/dist/win-unpacked/**
           retention-days: 7
 
   release:
@@ -58,17 +57,10 @@ jobs:
           name: openvoiceproxy-windows
           path: artifacts
 
-      - name: Create release zip
-        run: |
-          cd artifacts
-          zip -r ../openvoiceproxy-windows.zip .
-        shell: bash
-
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            openvoiceproxy-windows.zip
             artifacts/dist/CallTTS.exe
             artifacts/dist/OpenVoiceProxy Setup *.exe
         env:
