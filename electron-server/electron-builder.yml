@@ -8,18 +8,19 @@ files:
   - package.json
   - ui/**/*
   - assets/**/*
+  - from: ../tts-proxy/dist
+    to: node_modules/openvoiceproxy/dist
+  - from: ../tts-proxy/node_modules
+    to: node_modules/openvoiceproxy/node_modules
+  - from: ../tts-proxy/package.json
+    to: node_modules/openvoiceproxy/package.json
 extraResources:
   - from: dist/CallTTS.exe
     to: cli/CallTTS.exe
-  - from: ../tts-proxy/dist
-    to: openvoiceproxy/dist
-  - from: ../tts-proxy/node_modules
-    to: openvoiceproxy/node_modules
-  - from: ../tts-proxy/package.json
-    to: openvoiceproxy/package.json
 extraFiles:
   - from: dist/CallTTS.exe
     to: CallTTS.exe
+asar: true
 # Only build for Windows (no macOS)
 mac:
   target: []
