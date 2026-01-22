@@ -47,6 +47,13 @@ function handleLogout() {
                                 Engines
                             </router-link>
                             <router-link
+                                to="/test-voices"
+                                class="text-gray-600 hover:text-gray-900 transition-colors"
+                                active-class="text-blue-600 font-medium"
+                            >
+                                Test Voices
+                            </router-link>
+                            <router-link
                                 to="/settings"
                                 class="text-gray-600 hover:text-gray-900 transition-colors"
                                 active-class="text-blue-600 font-medium"
