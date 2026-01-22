@@ -82,3 +82,46 @@ export interface User {
   isAdmin: boolean
 }
 
+// Voice types (ElevenLabs-compatible format from backend)
+export interface Voice {
+  voice_id: string
+  name: string
+  samples: null
+  category: string // engine name
+  fine_tuning: {
+    is_allowed_to_fine_tune: boolean
+    state: Record<string, unknown>
+  }
+  labels: {
+    engine: string
+    language: string
+    gender?: string
+    [key: string]: string | undefined
+  }
+  description: string
+  preview_url: string | null
+  available_for_tiers: string[]
+  settings: null
+  sharing: null
+  high_quality_base_model_ids: string[]
+}
+
+export interface VoicesResponse {
+  voices: Voice[]
+}
+
+export interface VoiceSettings {
+  stability?: number
+  similarity_boost?: number
+  style?: number
+  use_speaker_boost?: boolean
+  speed?: number
+  pitch?: number
+}
+
+export interface SynthesizeRequest {
+  text: string
+  voice_settings?: VoiceSettings
+  output_format?: string
+}
+

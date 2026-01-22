@@ -91,6 +91,7 @@ export function createServer(
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'blob:'],
+        mediaSrc: ["'self'", 'blob:'],
         connectSrc: ["'self'", 'ws:', 'wss:'],
       },
     })
