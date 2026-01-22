@@ -11,6 +11,9 @@ jobs:
     runs-on: windows-latest
     env:
       ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+      ELECTRON_CACHE: ${{ github.workspace }}\electron-cache
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}\electron-builder-cache
+      NPM_CONFIG_CACHE: ${{ github.workspace }}\.npm-cache
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js 22
@@ -24,6 +27,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
+
+      - name: Prepare caches
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:ELECTRON_CACHE" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:ELECTRON_BUILDER_CACHE" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:NPM_CONFIG_CACHE" | Out-Null
 
       - name: Install workspace dependencies
         run: npm ci
